@@ -3,6 +3,7 @@ package mock
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 
@@ -83,7 +84,21 @@ func (d *DB) FindAll(collection string, slice interface{}, filter *db.Filter, op
 }
 
 func (d *DB) Update(collection string, object interface{}, filter *db.Filter) error {
-	panic("not implemented") // TODO: Implement
+	if err := checkParams(collection, filter); err != nil {
+		return fmt.Errorf("mock.DB.Update() error: %v", err)
+	}
+
+	dataMap := d.collectionMap[collection]
+	for i, data := range dataMap {
+		if compareInterfaceToFilter(data, filter) {
+			dataElem := reflect.ValueOf(&dataMap[i]).Elem()
+			dataElem.Set(reflect.ValueOf(object))
+			return nil
+
+		}
+	}
+
+	return errors.New("mock.DB.Update() error: no documents found")
 }
 
 func (d *DB) Upsert(collection string, object interface{}, filter *db.Filter) error {
@@ -96,6 +111,16 @@ func (d *DB) Delete(collection string, filter *db.Filter) error {
 
 func (d *DB) Search(collection string, search string, fields []string, object interface{}) error {
 	panic("not implemented") // TODO: Implement
+}
+
+func checkParams(collection string, filter *db.Filter) error {
+	if collection == "" {
+		return errors.New("collection cannot be empty")
+	}
+	if filter == nil || len(*filter) == 0 {
+		return errors.New("filter cannot be empty or nil")
+	}
+	return nil
 }
 
 func compareInterfaceToFilter(a interface{}, filter *db.Filter) bool {

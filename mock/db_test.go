@@ -162,6 +162,12 @@ func TestDB_FindAll(t *testing.T) {
 }
 
 func TestDB_Update(t *testing.T) {
+	testDB := &DB{
+		collectionMap: map[string][]interface{}{
+			"fooCollection":  {testObj{Name: "objName", Value: 123}},
+			"foo2Collection": {testObj{Name: "objName2", Value: 246}},
+		},
+	}
 	type args struct {
 		collection string
 		object     interface{}
@@ -173,12 +179,47 @@ func TestDB_Update(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		// TODO: Add test cases.
+		{"update0",
+			testDB,
+			args{
+				collection: "",
+				filter:     &db.Filter{"name": "objName"},
+				object:     testObj{"objNameChange", 321},
+			},
+			true,
+		},
+		{"update1",
+			testDB,
+			args{
+				collection: "fooCollection",
+				filter:     nil,
+				object:     testObj{"objNameChange", 321},
+			},
+			true,
+		},
+		{"update2",
+			testDB,
+			args{
+				collection: "fooCollection",
+				filter:     &db.Filter{"name": "objName"},
+				object:     testObj{"objNameChange", 321},
+			},
+			false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := tt.d.Update(tt.args.collection, tt.args.object, tt.args.filter); (err != nil) != tt.wantErr {
 				t.Errorf("DB.Update() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if !tt.wantErr {
+				for _, data := range tt.d.collectionMap[tt.args.collection] {
+					if reflect.DeepEqual(reflect.ValueOf(data).Interface(),
+						reflect.ValueOf(tt.args.object).Interface()) {
+						return
+					}
+					t.Errorf("could not find upated object")
+				}
 			}
 		})
 	}
