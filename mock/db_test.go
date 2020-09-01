@@ -79,7 +79,9 @@ func TestDB_Insert(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{"0:nil test", testDB, args{"test", nil}, true},
+		{"0:empty collection", testDB, args{"", nil}, true},
+		{"1:nil", testDB, args{"test", nil}, true},
+		{"2:single object", testDB, args{"test", &testObj{Name: "testObj1", Value: 123}}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -91,6 +93,12 @@ func TestDB_Insert(t *testing.T) {
 }
 
 func TestDB_FindOne(t *testing.T) {
+	testDB := &DB{
+		collectionMap: map[string][]interface{}{
+			"fooCollection":  {testObj{Name: "objName", Value: 123}},
+			"foo2Collection": {testObj{Name: "objName2", Value: 246}},
+		},
+	}
 	type args struct {
 		collection string
 		object     interface{}
@@ -103,12 +111,66 @@ func TestDB_FindOne(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		// TODO: Add test cases.
+		{
+			name: "FindOne()[0]",
+			args: args{
+				collection: "",
+				filter:     &db.Filter{"value": 123},
+				object:     &testObj{},
+				opts:       db.CreateOptions(),
+			},
+			d:       testDB,
+			wantErr: true,
+		},
+		{
+			name: "FindOne()[1]",
+			args: args{
+				collection: "testCollection",
+				filter:     nil,
+				object:     &testObj{},
+				opts:       db.CreateOptions(),
+			},
+			d:       testDB,
+			wantErr: true,
+		},
+		{
+			name: "FindOne()[2]",
+			args: args{
+				collection: "foo2Collection",
+				filter:     &db.Filter{"value": 246},
+				object:     &testObj{},
+				opts:       db.CreateOptions(),
+			},
+			d:       testDB,
+			wantErr: false,
+		},
+		{
+			name: "FindOne()[3]",
+			args: args{
+				collection: "fooCollection",
+				filter:     &db.Filter{"name": "objName"},
+				object:     &testObj{},
+				opts:       db.CreateOptions(),
+			},
+			d:       testDB,
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := tt.d.FindOne(tt.args.collection, tt.args.object, tt.args.filter, tt.args.opts); (err != nil) != tt.wantErr {
 				t.Errorf("DB.FindOne() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			// make sure we found what we wanted
+			if !tt.wantErr {
+				for _, data := range tt.d.collectionMap[tt.args.collection] {
+					if reflect.DeepEqual(reflect.ValueOf(data).Interface(),
+						reflect.ValueOf(tt.args.object).Elem().Interface()) {
+						return
+					}
+					t.Errorf("could not find \"found\" object")
+				}
 			}
 		})
 	}
@@ -218,14 +280,20 @@ func TestDB_Update(t *testing.T) {
 						reflect.ValueOf(tt.args.object).Interface()) {
 						return
 					}
-					t.Errorf("could not find upated object")
 				}
+				t.Errorf("could not find updated object")
 			}
 		})
 	}
 }
 
 func TestDB_Upsert(t *testing.T) {
+	testDB := &DB{
+		collectionMap: map[string][]interface{}{
+			"fooCollection":  {testObj{Name: "objName", Value: 123}},
+			"foo2Collection": {testObj{Name: "objName2", Value: 246}},
+		},
+	}
 	type args struct {
 		collection string
 		object     interface{}
@@ -237,18 +305,67 @@ func TestDB_Upsert(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		// TODO: Add test cases.
+		{"upsert0",
+			testDB,
+			args{
+				collection: "",
+				filter:     &db.Filter{"name": "objName"},
+				object:     testObj{"objNameChange", 321},
+			},
+			true,
+		},
+		{"upsert1",
+			testDB,
+			args{
+				collection: "fooCollection",
+				filter:     nil,
+				object:     testObj{"objNameChange", 321},
+			},
+			true,
+		},
+		{"upsert2",
+			testDB,
+			args{
+				collection: "fooCollection",
+				filter:     &db.Filter{"name": "objNameButNotInCollection"},
+				object:     testObj{"objNameChange1", 321},
+			},
+			false,
+		},
+		{"upsert3",
+			testDB,
+			args{
+				collection: "fooCollection",
+				filter:     &db.Filter{"name": "objName"},
+				object:     testObj{"objNameChange2", 321},
+			},
+			false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := tt.d.Upsert(tt.args.collection, tt.args.object, tt.args.filter); (err != nil) != tt.wantErr {
 				t.Errorf("DB.Upsert() error = %v, wantErr %v", err, tt.wantErr)
 			}
+			if !tt.wantErr {
+				for _, data := range tt.d.collectionMap[tt.args.collection] {
+					if reflect.DeepEqual(reflect.ValueOf(data).Interface(),
+						reflect.ValueOf(tt.args.object).Interface()) {
+						return
+					}
+				}
+				t.Errorf("could not find upserted object")
+			}
 		})
 	}
 }
 
 func TestDB_Delete(t *testing.T) {
+	testDB := &DB{
+		map[string][]interface{}{
+			"fooCollection": {testObj{"obj1", 1}, testObj{"obj2", 2}, testObj{"obj3", 3}, testObj{"obj4", 4}},
+		},
+	}
 	type args struct {
 		collection string
 		filter     *db.Filter
@@ -259,12 +376,29 @@ func TestDB_Delete(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		// TODO: Add test cases.
+		{name: "delete0", args: args{collection: ""}, d: testDB, wantErr: true},
+		{name: "delete1", args: args{collection: "fooCollection", filter: nil}, d: testDB, wantErr: true},
+		{name: "delete2", args: args{collection: "fooCollection", filter: &db.Filter{"name": "obj"}}, d: testDB, wantErr: true},
+		{name: "delete3", args: args{collection: "fooCollection", filter: &db.Filter{"name": "obj2"}}, d: testDB, wantErr: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := tt.d.Delete(tt.args.collection, tt.args.filter); (err != nil) != tt.wantErr {
 				t.Errorf("DB.Delete() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			if !tt.wantErr {
+				for _, filterVal := range *tt.args.filter {
+					for _, data := range tt.d.collectionMap[tt.args.collection] {
+						dataVal := reflect.ValueOf(data)
+						for i := 0; i < dataVal.NumField(); i++ {
+							if reflect.DeepEqual(dataVal.Field(i).Interface(),
+								reflect.ValueOf(filterVal).Interface()) {
+								t.Errorf("found the object still collection: %v", data)
+							}
+						}
+					}
+				}
 			}
 		})
 	}

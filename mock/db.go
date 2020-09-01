@@ -24,6 +24,9 @@ func (d *DB) Close(ctx context.Context) error {
 }
 
 func (d *DB) Insert(collection string, object interface{}) error {
+	if collection == "" {
+		return errors.New("collection is empty")
+	}
 	if object == nil {
 		return errors.New("object is nil")
 	}
@@ -43,8 +46,8 @@ func (d *DB) FindOne(collection string, object interface{}, filter *db.Filter, o
 		return errors.New("collection doesn not exist")
 	}
 
-	dataMap := d.collectionMap[collection]
-	for _, data := range dataMap {
+	dataSlice := d.collectionMap[collection]
+	for _, data := range dataSlice {
 		if compareInterfaceToFilter(data, filter) {
 			return setValue(object, data)
 		}
@@ -71,8 +74,8 @@ func (d *DB) FindAll(collection string, slice interface{}, filter *db.Filter, op
 		filter = &db.Filter{}
 	}
 
-	dataMap := d.collectionMap[collection]
-	for _, data := range dataMap {
+	dataSlice := d.collectionMap[collection]
+	for _, data := range dataSlice {
 		if compareInterfaceToFilter(data, filter) {
 			dataVal := reflect.ValueOf(data)
 			sliceVal = reflect.Append(sliceVal, dataVal)
@@ -88,13 +91,10 @@ func (d *DB) Update(collection string, object interface{}, filter *db.Filter) er
 		return fmt.Errorf("mock.DB.Update() error: %v", err)
 	}
 
-	dataMap := d.collectionMap[collection]
-	for i, data := range dataMap {
+	dataSlice := d.collectionMap[collection]
+	for i, data := range dataSlice {
 		if compareInterfaceToFilter(data, filter) {
-			dataElem := reflect.ValueOf(&dataMap[i]).Elem()
-			dataElem.Set(reflect.ValueOf(object))
-			return nil
-
+			return setValue(&dataSlice[i], object)
 		}
 	}
 
@@ -102,11 +102,40 @@ func (d *DB) Update(collection string, object interface{}, filter *db.Filter) er
 }
 
 func (d *DB) Upsert(collection string, object interface{}, filter *db.Filter) error {
-	panic("not implemented") // TODO: Implement
+	if err := checkParams(collection, filter); err != nil {
+		return fmt.Errorf("mock.DB.Update() error: %v", err)
+	}
+	dataSlice := d.collectionMap[collection]
+	for i, data := range dataSlice {
+		if compareInterfaceToFilter(data, filter) {
+			return setValue(&dataSlice[i], object)
+		}
+	}
+	return d.Insert(collection, object)
 }
 
 func (d *DB) Delete(collection string, filter *db.Filter) error {
-	panic("not implemented") // TODO: Implement
+	if err := checkParams(collection, filter); err != nil {
+		return fmt.Errorf("mock.DB.Update() error: %v", err)
+	}
+	dataSlice := d.collectionMap[collection]
+	for i, data := range dataSlice {
+		if compareInterfaceToFilter(data, filter) {
+			// gather the slice around the object
+			part1 := reflect.ValueOf(dataSlice).Slice(0, i)
+			part2 := reflect.ValueOf(dataSlice).Slice(i+1, len(dataSlice))
+
+			// create a new slice and append
+			newSlice := make([]interface{}, 0)
+			newSliceVal := reflect.ValueOf(newSlice)
+			newSliceVal = reflect.Append(newSliceVal, part1, part2)
+
+			// set it as the new []interface{} for that collection
+			d.collectionMap[collection] = newSlice
+			return nil
+		}
+	}
+	return errors.New("mock.DB.Delete(): no documents found")
 }
 
 func (d *DB) Search(collection string, search string, fields []string, object interface{}) error {
@@ -157,10 +186,10 @@ func isLowerEqual(a, b string) bool {
 	return strings.Compare(strings.ToLower(a), strings.ToLower(b)) == 0
 }
 
-func setValue(object, data interface{}) error {
-	if reflect.TypeOf(object).Kind() != reflect.Ptr {
+func setValue(into, datafrom interface{}) error {
+	if reflect.TypeOf(into).Kind() != reflect.Ptr {
 		return errors.New("input object is not type pointer")
 	}
-	reflect.ValueOf(object).Elem().Set(reflect.ValueOf(data))
+	reflect.ValueOf(into).Elem().Set(reflect.ValueOf(datafrom))
 	return nil
 }
