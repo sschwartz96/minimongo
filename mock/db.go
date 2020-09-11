@@ -14,6 +14,10 @@ type DB struct {
 	collectionMap map[string]([]interface{})
 }
 
+func CreateDB() *DB {
+	return &DB{collectionMap: make(map[string][]interface{})}
+}
+
 func (d *DB) Open(ctx context.Context) error {
 	d.collectionMap = make(map[string]([]interface{}))
 	return nil
