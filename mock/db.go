@@ -24,6 +24,7 @@ func (d *DB) Open(ctx context.Context) error {
 }
 
 func (d *DB) Close(ctx context.Context) error {
+	d.collectionMap = nil
 	return nil
 }
 
@@ -142,8 +143,22 @@ func (d *DB) Delete(collection string, filter *db.Filter) error {
 	return errors.New("mock.DB.Delete(): no documents found")
 }
 
-func (d *DB) Search(collection string, search string, fields []string, object interface{}) error {
-	panic("not implemented") // TODO: Implement
+func (d *DB) Search(collection string, search string, fields []string, slice interface{}) error {
+	dataSlice := d.collectionMap[collection]
+	pointerVal := reflect.ValueOf(slice)
+	sliceVal := pointerVal.Elem()
+	for _, data := range dataSlice {
+		dataVal := reflect.ValueOf(data)
+		for _, field := range fields {
+			fieldValue := dataVal.FieldByName(field)
+			if strings.Contains(fieldValue.String(), search) {
+				sliceVal = reflect.Append(sliceVal, dataVal)
+			}
+		}
+	}
+
+	pointerVal.Elem().Set(sliceVal)
+	return nil
 }
 
 func checkParams(collection string, filter *db.Filter) error {

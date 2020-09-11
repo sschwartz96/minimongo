@@ -404,25 +404,91 @@ func TestDB_Delete(t *testing.T) {
 	}
 }
 
-func TestDB_Search(t *testing.T) {
+func Test_Search(t *testing.T) {
+	testDB := &DB{collectionMap: map[string][]interface{}{
+		"testCol": {
+			testObj{
+				Name:  "test object 1",
+				Value: 123,
+			},
+			testObj{
+				Name:  "this is object 2",
+				Value: 123,
+			},
+			testObj{
+				Name:  "test object 3",
+				Value: 123,
+			},
+		},
+	}}
 	type args struct {
 		collection string
 		search     string
 		fields     []string
-		object     interface{}
+		slice      interface{}
 	}
 	tests := []struct {
-		name    string
-		d       *DB
-		args    args
-		wantErr bool
+		name        string
+		d           *DB
+		args        args
+		wantErr     bool
+		endingSlice *[]testObj
 	}{
-		// TODO: Add test cases.
+		{
+			name: "Search()_0",
+			args: args{
+				collection: "testCol",
+				fields:     []string{"Name"},
+				slice:      &[]testObj{},
+				search:     "object",
+			},
+			d:       testDB,
+			wantErr: false,
+			endingSlice: &[]testObj{
+				{
+					Name:  "test object 1",
+					Value: 123,
+				},
+				{
+					Name:  "this is object 2",
+					Value: 123,
+				},
+				{
+					Name:  "test object 3",
+					Value: 123,
+				},
+			},
+		},
+		{
+			name: "Search()_0",
+			args: args{
+				collection: "testCol",
+				fields:     []string{"Name"},
+				slice:      &[]testObj{},
+				search:     "test",
+			},
+			d:       testDB,
+			wantErr: false,
+			endingSlice: &[]testObj{
+				{
+					Name:  "test object 1",
+					Value: 123,
+				},
+				{
+					Name:  "test object 3",
+					Value: 123,
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := tt.d.Search(tt.args.collection, tt.args.search, tt.args.fields, tt.args.object); (err != nil) != tt.wantErr {
+			if err := tt.d.Search(tt.args.collection, tt.args.search, tt.args.fields, tt.args.slice); (err != nil) != tt.wantErr {
 				t.Errorf("DB.Search() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			if !reflect.DeepEqual(tt.args.slice, tt.endingSlice) {
+				t.Errorf("DB.Search() error = wrong slice, got: %v, wanted: %v", tt.args.slice, tt.endingSlice)
 			}
 		})
 	}
