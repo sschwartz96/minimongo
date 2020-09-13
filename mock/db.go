@@ -186,7 +186,7 @@ func compareInterfaceToFilter(a interface{}, filter *db.Filter) bool {
 		for i := 0; i < aVal.NumField(); i++ {
 			fieldVal := aVal.Field(i)
 			fieldName := aVal.Type().Field(i).Name
-			if isLowerEqual(filterKey, fieldName) {
+			if isLowerEqual(filterKey, fieldName) || isLowerEqual() {
 				if isEqual(reflect.ValueOf(filterVal), fieldVal) {
 					break
 				} else {
@@ -206,6 +206,12 @@ func isEqual(a, b reflect.Value) bool {
 }
 
 func isLowerEqual(a, b string) bool {
+	return strings.Compare(strings.ToLower(a), strings.ToLower(b)) == 0
+}
+
+func isLowerEqualWoUnderscore(a, b string) bool {
+	a = strings.ReplaceAll(a, "_", "")
+	b = strings.ReplaceAll(b, "_", "")
 	return strings.Compare(strings.ToLower(a), strings.ToLower(b)) == 0
 }
 
