@@ -1,4 +1,7 @@
 # minimongo
+
+** Current state: ALPHA **
+
 In-memory mongo-go-driver implementation
 
 Useful in two ways:
