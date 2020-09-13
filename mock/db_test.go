@@ -2,6 +2,7 @@ package mock
 
 import (
 	"context"
+	"log"
 	"reflect"
 	"testing"
 
@@ -90,7 +91,7 @@ func TestDB_Insert(t *testing.T) {
 				t.Errorf("DB.Insert() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			if tt.args.object != nil {
-				for _, o := range tt.d.collectionMap[tt.args.collection] {
+				for _, o := range *tt.d.collectionMap[tt.args.collection] {
 					if reflect.DeepEqual(tt.args.object, o) {
 						return
 					}
@@ -103,7 +104,7 @@ func TestDB_Insert(t *testing.T) {
 
 func TestDB_FindOne(t *testing.T) {
 	testDB := &DB{
-		collectionMap: map[string][]interface{}{
+		collectionMap: map[string]*[]interface{}{
 			"fooCollection":  {testObj{"objName", 123}},
 			"foo2Collection": {testObj{"objName2", 246}},
 			"fooPointerCol":  {&testObj{"objPointer", 246}},
@@ -196,7 +197,7 @@ func TestDB_FindOne(t *testing.T) {
 
 			// make sure we found what we wanted
 			if !tt.wantErr {
-				for _, data := range tt.d.collectionMap[tt.args.collection] {
+				for _, data := range *tt.d.collectionMap[tt.args.collection] {
 					dataVal := reflect.ValueOf(data)
 					if dataVal.Kind() == reflect.Ptr {
 						if reflect.DeepEqual(dataVal.Interface(),
@@ -218,7 +219,7 @@ func TestDB_FindOne(t *testing.T) {
 
 func TestDB_FindAll(t *testing.T) {
 	testDB := &DB{
-		collectionMap: map[string][]interface{}{
+		collectionMap: map[string]*[]interface{}{
 			"fooCollection":  {testObj{"objName", 123}, testObj{"obj2Name", 456}, testObj{"obj3Name", 456}},
 			"foo2Collection": {testObj{"objName2", 246}},
 		},
@@ -340,7 +341,7 @@ func TestDB_FindAll(t *testing.T) {
 
 func TestDB_Update(t *testing.T) {
 	testDB := &DB{
-		collectionMap: map[string][]interface{}{
+		collectionMap: map[string]*[]interface{}{
 			"fooCollection":  {testObj{Name: "objName", Value: 123}},
 			"foo2Collection": {testObj{Name: "objName2", Value: 246}},
 		},
@@ -399,7 +400,7 @@ func TestDB_Update(t *testing.T) {
 				t.Errorf("DB.Update() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			if !tt.wantErr {
-				for _, data := range tt.d.collectionMap[tt.args.collection] {
+				for _, data := range *tt.d.collectionMap[tt.args.collection] {
 					if reflect.DeepEqual(reflect.ValueOf(data).Interface(),
 						reflect.ValueOf(tt.args.object).Interface()) {
 						return
@@ -413,7 +414,7 @@ func TestDB_Update(t *testing.T) {
 
 func TestDB_Upsert(t *testing.T) {
 	testDB := &DB{
-		collectionMap: map[string][]interface{}{
+		collectionMap: map[string]*[]interface{}{
 			"fooCollection":  {testObj{Name: "objName", Value: 123}},
 			"foo2Collection": {testObj{Name: "objName2", Value: 246}},
 		},
@@ -472,7 +473,7 @@ func TestDB_Upsert(t *testing.T) {
 				t.Errorf("DB.Upsert() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			if !tt.wantErr {
-				for _, data := range tt.d.collectionMap[tt.args.collection] {
+				for _, data := range *tt.d.collectionMap[tt.args.collection] {
 					if reflect.DeepEqual(reflect.ValueOf(data).Interface(),
 						reflect.ValueOf(tt.args.object).Interface()) {
 						return
@@ -486,7 +487,7 @@ func TestDB_Upsert(t *testing.T) {
 
 func TestDB_Delete(t *testing.T) {
 	testDB := &DB{
-		map[string][]interface{}{
+		map[string]*[]interface{}{
 			"fooCollection": {testObj{"obj1", 1}, testObj{"obj2", 2}, testObj{"obj3", 3}, testObj{"obj4", 4}},
 		},
 	}
@@ -513,8 +514,9 @@ func TestDB_Delete(t *testing.T) {
 
 			if !tt.wantErr {
 				for _, filterVal := range *tt.args.filter {
-					for _, data := range tt.d.collectionMap[tt.args.collection] {
+					for _, data := range *tt.d.collectionMap[tt.args.collection] {
 						dataVal := reflect.ValueOf(data)
+						log.Println("db:", *tt.d.collectionMap[tt.args.collection])
 						for i := 0; i < dataVal.NumField(); i++ {
 							if reflect.DeepEqual(dataVal.Field(i).Interface(),
 								reflect.ValueOf(filterVal).Interface()) {
@@ -529,7 +531,7 @@ func TestDB_Delete(t *testing.T) {
 }
 
 func Test_Search(t *testing.T) {
-	testDB := &DB{collectionMap: map[string][]interface{}{
+	testDB := &DB{collectionMap: map[string]*[]interface{}{
 		"testCol": {
 			testObj{
 				Name:  "test object 1",

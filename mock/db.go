@@ -11,15 +11,15 @@ import (
 )
 
 type DB struct {
-	collectionMap map[string]([]interface{})
+	collectionMap map[string](*[]interface{})
 }
 
 func CreateDB() *DB {
-	return &DB{collectionMap: make(map[string][]interface{})}
+	return &DB{collectionMap: make(map[string]*[]interface{})}
 }
 
 func (d *DB) Open(ctx context.Context) error {
-	d.collectionMap = make(map[string]([]interface{}))
+	d.collectionMap = make(map[string](*[]interface{}))
 	return nil
 }
 
@@ -37,10 +37,12 @@ func (d *DB) Insert(collection string, object interface{}) error {
 	}
 
 	if d.collectionMap[collection] == nil {
-		d.collectionMap[collection] = make([]interface{}, 1)
-		d.collectionMap[collection][0] = object
+		col := make([]interface{}, 1)
+		col[0] = object
+		d.collectionMap[collection] = &col
 	} else {
-		d.collectionMap[collection] = append(d.collectionMap[collection], object)
+		col := d.collectionMap[collection]
+		*col = append(*col, object)
 	}
 
 	return nil
@@ -52,7 +54,7 @@ func (d *DB) FindOne(collection string, object interface{}, filter *db.Filter, o
 	}
 
 	dataSlice := d.collectionMap[collection]
-	for _, data := range dataSlice {
+	for _, data := range *dataSlice {
 		if compareInterfaceToFilter(data, filter) {
 			return setValue(object, data)
 		}
@@ -80,7 +82,7 @@ func (d *DB) FindAll(collection string, slice interface{}, filter *db.Filter, op
 	}
 
 	dataSlice := d.collectionMap[collection]
-	for _, data := range dataSlice {
+	for _, data := range *dataSlice {
 		if compareInterfaceToFilter(data, filter) {
 			dataVal := reflect.ValueOf(data)
 			sliceVal = reflect.Append(sliceVal, dataVal)
@@ -97,9 +99,9 @@ func (d *DB) Update(collection string, object interface{}, filter *db.Filter) er
 	}
 
 	dataSlice := d.collectionMap[collection]
-	for i, data := range dataSlice {
+	for i, data := range *dataSlice {
 		if compareInterfaceToFilter(data, filter) {
-			return setValue(&dataSlice[i], object)
+			return setValue(&(*dataSlice)[i], object)
 		}
 	}
 
@@ -111,9 +113,9 @@ func (d *DB) Upsert(collection string, object interface{}, filter *db.Filter) er
 		return fmt.Errorf("mock.DB.Update() error: %v", err)
 	}
 	dataSlice := d.collectionMap[collection]
-	for i, data := range dataSlice {
+	for i, data := range *dataSlice {
 		if compareInterfaceToFilter(data, filter) {
-			return setValue(&dataSlice[i], object)
+			return setValue(&(*dataSlice)[i], object)
 		}
 	}
 	return d.Insert(collection, object)
@@ -124,19 +126,20 @@ func (d *DB) Delete(collection string, filter *db.Filter) error {
 		return fmt.Errorf("mock.DB.Update() error: %v", err)
 	}
 	dataSlice := d.collectionMap[collection]
-	for i, data := range dataSlice {
+	//dataSlicePtr := &dataSlice
+	for i, data := range *dataSlice {
 		if compareInterfaceToFilter(data, filter) {
+			// get the slice value and slice value element
+			sliceVal := reflect.ValueOf(d.collectionMap[collection])
+			sliceValElem := sliceVal.Elem()
+
 			// gather the slice around the object
-			part1 := reflect.ValueOf(dataSlice).Slice(0, i)
-			part2 := reflect.ValueOf(dataSlice).Slice(i+1, len(dataSlice))
+			part1 := sliceValElem.Slice(0, i)
+			part2 := sliceValElem.Slice(i+1, len(*dataSlice))
 
 			// create a new slice and append
-			newSlice := make([]interface{}, 0)
-			newSliceVal := reflect.ValueOf(newSlice)
-			newSliceVal = reflect.Append(newSliceVal, part1, part2)
+			sliceValElem.Set(reflect.AppendSlice(part1, part2))
 
-			// set it as the new []interface{} for that collection
-			d.collectionMap[collection] = newSlice
 			return nil
 		}
 	}
@@ -147,7 +150,7 @@ func (d *DB) Search(collection string, search string, fields []string, slice int
 	dataSlice := d.collectionMap[collection]
 	pointerVal := reflect.ValueOf(slice)
 	sliceVal := pointerVal.Elem()
-	for _, data := range dataSlice {
+	for _, data := range *dataSlice {
 		dataVal := reflect.ValueOf(data)
 		for _, field := range fields {
 			fieldValue := dataVal.FieldByName(field)
@@ -186,7 +189,8 @@ func compareInterfaceToFilter(a interface{}, filter *db.Filter) bool {
 		for i := 0; i < aVal.NumField(); i++ {
 			fieldVal := aVal.Field(i)
 			fieldName := aVal.Type().Field(i).Name
-			if isLowerEqual(filterKey, fieldName) || isLowerEqual() {
+			if isLowerEqual(filterKey, fieldName) ||
+				isLowerEqual(removeUnderscore(filterKey), removeUnderscore(fieldName)) {
 				if isEqual(reflect.ValueOf(filterVal), fieldVal) {
 					break
 				} else {
@@ -209,10 +213,8 @@ func isLowerEqual(a, b string) bool {
 	return strings.Compare(strings.ToLower(a), strings.ToLower(b)) == 0
 }
 
-func isLowerEqualWoUnderscore(a, b string) bool {
-	a = strings.ReplaceAll(a, "_", "")
-	b = strings.ReplaceAll(b, "_", "")
-	return strings.Compare(strings.ToLower(a), strings.ToLower(b)) == 0
+func removeUnderscore(s string) string {
+	return strings.ReplaceAll(s, "_", "")
 }
 
 func setValue(into, datafrom interface{}) error {
