@@ -18,3 +18,5 @@ TODO:
 - [x] Upsert(collection string, object interface{}, filter *Filter) error
 - [x] Delete(collection string, filter *Filter) error
 - [x] Search(collection, search string, fields []string, object interface{}) error
+
+# filter matching will remove underscores in field names
