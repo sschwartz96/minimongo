@@ -64,7 +64,7 @@ func (d *DB) FindOne(collection string, object interface{}, filter *db.Filter, o
 func (d *DB) FindAll(collection string, slice interface{}, filter *db.Filter, opts *db.Options) error {
 	pointerVal := reflect.ValueOf(slice)
 	if pointerVal.Kind() != reflect.Ptr {
-		return errors.New("slice arg must be a *pointer* to slice")
+		return errors.New("slice arg must be a *pointer* (to slice)")
 	}
 	sliceVal := pointerVal.Elem()
 	if sliceVal.Kind() != reflect.Slice {
@@ -178,6 +178,10 @@ func compareInterfaceToFilter(a interface{}, filter *db.Filter) bool {
 		return false
 	}
 
+	if aVal.Kind() == reflect.Ptr {
+		aVal = aVal.Elem()
+	}
+
 	for filterKey, filterVal := range *filter {
 		for i := 0; i < aVal.NumField(); i++ {
 			fieldVal := aVal.Field(i)
@@ -209,6 +213,10 @@ func setValue(into, datafrom interface{}) error {
 	if reflect.TypeOf(into).Kind() != reflect.Ptr {
 		return errors.New("input object is not type pointer")
 	}
-	reflect.ValueOf(into).Elem().Set(reflect.ValueOf(datafrom))
+	datafromVal := reflect.ValueOf(datafrom)
+	if datafromVal.Kind() == reflect.Ptr {
+		datafromVal = datafromVal.Elem()
+	}
+	reflect.ValueOf(into).Elem().Set(datafromVal)
 	return nil
 }

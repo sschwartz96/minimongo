@@ -81,12 +81,21 @@ func TestDB_Insert(t *testing.T) {
 	}{
 		{"0:empty collection", testDB, args{"", nil}, true},
 		{"1:nil", testDB, args{"test", nil}, true},
-		{"2:single object", testDB, args{"test", &testObj{Name: "testObj1", Value: 123}}, false},
+		{"2:single object", testDB, args{"test", testObj{Name: "testObj1", Value: 123}}, false},
+		{"2:single ptr object", testDB, args{"test", &testObj{Name: "testObj1", Value: 123}}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := tt.d.Insert(tt.args.collection, tt.args.object); (err != nil) != tt.wantErr {
 				t.Errorf("DB.Insert() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.args.object != nil {
+				for _, o := range tt.d.collectionMap[tt.args.collection] {
+					if reflect.DeepEqual(tt.args.object, o) {
+						return
+					}
+				}
+				t.Errorf("could not find inserted object")
 			}
 		})
 	}
@@ -95,8 +104,9 @@ func TestDB_Insert(t *testing.T) {
 func TestDB_FindOne(t *testing.T) {
 	testDB := &DB{
 		collectionMap: map[string][]interface{}{
-			"fooCollection":  {testObj{Name: "objName", Value: 123}},
-			"foo2Collection": {testObj{Name: "objName2", Value: 246}},
+			"fooCollection":  {testObj{"objName", 123}},
+			"foo2Collection": {testObj{"objName2", 246}},
+			"fooPointerCol":  {&testObj{"objPointer", 246}},
 		},
 	}
 	type args struct {
@@ -155,6 +165,28 @@ func TestDB_FindOne(t *testing.T) {
 			d:       testDB,
 			wantErr: false,
 		},
+		{
+			name: "FindOne()[4]",
+			args: args{
+				collection: "fooPointerCol",
+				filter:     &db.Filter{"name": "objPointer"},
+				object:     &testObj{},
+				opts:       db.CreateOptions(),
+			},
+			d:       testDB,
+			wantErr: false,
+		},
+		{
+			name: "FindOne()[5]",
+			args: args{
+				collection: "fooPointerCol",
+				filter:     &db.Filter{"name": "canfindthis"},
+				object:     &testObj{},
+				opts:       db.CreateOptions(),
+			},
+			d:       testDB,
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -165,11 +197,19 @@ func TestDB_FindOne(t *testing.T) {
 			// make sure we found what we wanted
 			if !tt.wantErr {
 				for _, data := range tt.d.collectionMap[tt.args.collection] {
-					if reflect.DeepEqual(reflect.ValueOf(data).Interface(),
-						reflect.ValueOf(tt.args.object).Elem().Interface()) {
-						return
+					dataVal := reflect.ValueOf(data)
+					if dataVal.Kind() == reflect.Ptr {
+						if reflect.DeepEqual(dataVal.Interface(),
+							reflect.ValueOf(tt.args.object).Interface()) {
+							return
+						}
+					} else {
+						if reflect.DeepEqual(dataVal.Interface(),
+							reflect.ValueOf(tt.args.object).Elem().Interface()) {
+							return
+						}
 					}
-					t.Errorf("could not find \"found\" object")
+					t.Errorf("could not find \"found\" object, ")
 				}
 			}
 		})
@@ -179,8 +219,8 @@ func TestDB_FindOne(t *testing.T) {
 func TestDB_FindAll(t *testing.T) {
 	testDB := &DB{
 		collectionMap: map[string][]interface{}{
-			"fooCollection":  {testObj{Name: "objName", Value: 123}},
-			"foo2Collection": {testObj{Name: "objName2", Value: 246}},
+			"fooCollection":  {testObj{"objName", 123}, testObj{"obj2Name", 456}, testObj{"obj3Name", 456}},
+			"foo2Collection": {testObj{"objName2", 246}},
 		},
 	}
 	type args struct {
@@ -197,7 +237,7 @@ func TestDB_FindAll(t *testing.T) {
 		endingSlice *[]testObj
 	}{
 		{
-			name: "findall",
+			name: "FindAll()[0]single",
 			d:    testDB,
 			args: args{
 				collection: "fooCollection",
@@ -210,13 +250,88 @@ func TestDB_FindAll(t *testing.T) {
 				{Name: "objName", Value: 123},
 			},
 		},
+		{
+			name: "FindAll()[1]two values",
+			d:    testDB,
+			args: args{
+				collection: "fooCollection",
+				slice:      &[]testObj{},
+				filter:     &db.Filter{"value": 456},
+				opts:       nil,
+			},
+			wantErr: false,
+			endingSlice: &[]testObj{
+				{Name: "obj2Name", Value: 456},
+				{Name: "obj3Name", Value: 456},
+			},
+		},
+		{
+			name: "FindAll()[2]not pointer to slice",
+			d:    testDB,
+			args: args{
+				collection: "fooCollection",
+				slice:      []testObj{},
+				filter:     &db.Filter{"value": 456},
+				opts:       nil,
+			},
+			wantErr:     true,
+			endingSlice: &[]testObj{},
+		},
+		{
+			name: "FindAll()[3]not slice",
+			d:    testDB,
+			args: args{
+				collection: "fooCollection",
+				slice:      &testObj{},
+				filter:     &db.Filter{"value": 456},
+				opts:       nil,
+			},
+			wantErr:     true,
+			endingSlice: &[]testObj{},
+		},
+		{
+			name: "FindAll()[3]not slice",
+			d:    testDB,
+			args: args{
+				collection: "fooCollection",
+				slice:      &testObj{},
+				filter:     &db.Filter{},
+				opts:       nil,
+			},
+			wantErr:     true,
+			endingSlice: &[]testObj{},
+		},
+		{
+			name: "FindAll()[4]collection does not exist",
+			d:    testDB,
+			args: args{
+				collection: "thisIsn'tACollection",
+				slice:      &[]testObj{},
+				filter:     &db.Filter{},
+				opts:       nil,
+			},
+			wantErr:     true,
+			endingSlice: &[]testObj{},
+		},
+		{
+			name: "FindAll()[5]all_fooCollection",
+			d:    testDB,
+			args: args{
+				collection: "fooCollection",
+				slice:      &[]testObj{},
+				filter:     nil,
+				opts:       nil,
+			},
+			wantErr:     false,
+			endingSlice: &[]testObj{{"objName", 123}, {"obj2Name", 456}, {"obj3Name", 456}},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := tt.d.FindAll(tt.args.collection, tt.args.slice, tt.args.filter, tt.args.opts); (err != nil) != tt.wantErr {
 				t.Errorf("DB.FindAll() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			if !reflect.DeepEqual(tt.args.slice, tt.endingSlice) {
+			if !tt.wantErr && !reflect.DeepEqual(tt.args.slice, tt.endingSlice) {
 				t.Errorf("DB.FindAll() error = wrong slice, got: %v, wanted: %v", tt.args.slice, tt.endingSlice)
 			}
 		})
@@ -267,6 +382,15 @@ func TestDB_Update(t *testing.T) {
 				object:     testObj{"objNameChange", 321},
 			},
 			false,
+		},
+		{"update3_no docs",
+			testDB,
+			args{
+				collection: "fooCollection",
+				filter:     &db.Filter{"name": "notfound"},
+				object:     testObj{"objNameChange", 321},
+			},
+			true,
 		},
 	}
 	for _, tt := range tests {
