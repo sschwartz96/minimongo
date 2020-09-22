@@ -14,6 +14,7 @@ type testObj struct {
 }
 
 func TestDB_Open(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		ctx context.Context
 	}
@@ -42,6 +43,7 @@ func TestDB_Open(t *testing.T) {
 }
 
 func TestDB_Close(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		ctx context.Context
 	}
@@ -63,6 +65,7 @@ func TestDB_Close(t *testing.T) {
 }
 
 func TestDB_Insert(t *testing.T) {
+	t.Parallel()
 	testDB := &DB{}
 	err := testDB.Open(context.Background())
 	if err != nil {
@@ -93,6 +96,7 @@ func TestDB_Insert(t *testing.T) {
 }
 
 func TestDB_FindOne(t *testing.T) {
+	t.Parallel()
 	testDB := &DB{
 		collectionMap: map[string][]interface{}{
 			"fooCollection":  {testObj{Name: "objName", Value: 123}},
@@ -177,6 +181,7 @@ func TestDB_FindOne(t *testing.T) {
 }
 
 func TestDB_FindAll(t *testing.T) {
+	t.Parallel()
 	testDB := &DB{
 		collectionMap: map[string][]interface{}{
 			"fooCollection":  {testObj{Name: "objName", Value: 123}},
@@ -224,6 +229,7 @@ func TestDB_FindAll(t *testing.T) {
 }
 
 func TestDB_Update(t *testing.T) {
+	t.Parallel()
 	testDB := &DB{
 		collectionMap: map[string][]interface{}{
 			"fooCollection":  {testObj{Name: "objName", Value: 123}},
@@ -288,6 +294,7 @@ func TestDB_Update(t *testing.T) {
 }
 
 func TestDB_Upsert(t *testing.T) {
+	t.Parallel()
 	testDB := &DB{
 		collectionMap: map[string][]interface{}{
 			"fooCollection":  {testObj{Name: "objName", Value: 123}},
@@ -361,6 +368,7 @@ func TestDB_Upsert(t *testing.T) {
 }
 
 func TestDB_Delete(t *testing.T) {
+	t.Parallel()
 	testDB := &DB{
 		map[string][]interface{}{
 			"fooCollection": {testObj{"obj1", 1}, testObj{"obj2", 2}, testObj{"obj3", 3}, testObj{"obj4", 4}},
@@ -405,6 +413,7 @@ func TestDB_Delete(t *testing.T) {
 }
 
 func Test_Search(t *testing.T) {
+	t.Parallel()
 	testDB := &DB{collectionMap: map[string][]interface{}{
 		"testCol": {
 			testObj{
