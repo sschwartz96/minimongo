@@ -1,4 +1,7 @@
 # minimongo
+
+** Current state: ALPHA **
+
 In-memory mongo-go-driver implementation
 
 Useful in two ways:
@@ -11,9 +14,12 @@ TODO:
 - [x] Close(ctx context.Context) error
 
 - [x] Insert(collection string, object interface{}) error
+- [ ] InsertMany(collection string, slice interface{}) error
 - [x] FindOne(collection string, object interface{}, filter *Filter, opts *Options) error
 - [x] FindAll(collection string, object interface{}, filter *Filter, opts *Options) error
-- [ ] Update(collection string, object interface{}, filter *Filter) error
-- [ ] Upsert(collection string, object interface{}, filter *Filter) error
-- [ ] Delete(collection string, filter *Filter) error
-- [ ] Search(collection, search string, fields []string, object interface{}) error
+- [x] Update(collection string, object interface{}, filter *Filter) error
+- [x] Upsert(collection string, object interface{}, filter *Filter) error
+- [x] Delete(collection string, filter *Filter) error
+- [x] Search(collection, search string, fields []string, object interface{}) error
+
+# filter matching will remove underscores in field names
