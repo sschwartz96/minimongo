@@ -426,6 +426,9 @@ func TestDB_Upsert(t *testing.T) {
 			"foo2Collection": {testObj{Name: "objName2", Value: 246}},
 		},
 	}
+	emptyTestDB := &DB{
+		collectionMap: map[string]*[]interface{}{},
+	}
 	type args struct {
 		collection string
 		object     interface{}
@@ -437,6 +440,15 @@ func TestDB_Upsert(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
+		{"upsert0",
+			emptyTestDB,
+			args{
+				collection: "",
+				filter:     &db.Filter{"name": "objName"},
+				object:     testObj{"onlyObj", 111111111},
+			},
+			true,
+		},
 		{"upsert0",
 			testDB,
 			args{

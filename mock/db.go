@@ -113,6 +113,10 @@ func (d *DB) Upsert(collection string, object interface{}, filter *db.Filter) er
 		return fmt.Errorf("mock.DB.Update() error: %v", err)
 	}
 	dataSlice := d.collectionMap[collection]
+	// if collection is empty just insert
+	if dataSlice == nil {
+		return d.Insert(collection, object)
+	}
 	for i, data := range *dataSlice {
 		if compareInterfaceToFilter(data, filter) {
 			return setValue(&(*dataSlice)[i], object)

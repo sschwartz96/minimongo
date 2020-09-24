@@ -10,6 +10,10 @@ Useful in two ways:
 
 
 TODO:
+- [ ] Support limit option
+- [ ] Support skip option
+- [ ] Support sort option
+
 - [x] Open(ctx context.Context) error
 - [x] Close(ctx context.Context) error
 
