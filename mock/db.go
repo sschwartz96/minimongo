@@ -36,13 +36,16 @@ func (d *DB) Insert(collection string, object interface{}) error {
 		return errors.New("object is nil")
 	}
 
+	// this allows pointers to be derefenced
+	toInsert := reflect.ValueOf(object).Interface()
+
 	if d.collectionMap[collection] == nil {
 		col := make([]interface{}, 1)
-		col[0] = object
+		col[0] = toInsert
 		d.collectionMap[collection] = &col
 	} else {
 		col := d.collectionMap[collection]
-		*col = append(*col, object)
+		*col = append(*col, toInsert)
 	}
 
 	return nil
@@ -53,14 +56,25 @@ func (d *DB) FindOne(collection string, object interface{}, filter *db.Filter, o
 		return errors.New("collection doesn not exist")
 	}
 
-	dataSlice := d.collectionMap[collection]
-	for _, data := range *dataSlice {
-		if compareInterfaceToFilter(data, filter) {
-			return setValue(object, data)
-		}
+	// grab the value of the object which should be a ptr
+	pointerVal := reflect.ValueOf(object)
+	if pointerVal.Kind() != reflect.Ptr {
+		return errors.New("object arg must be a *pointer* (to [Type])")
+	}
+	// get the slice type of our object type
+	sliceType := reflect.SliceOf(pointerVal.Elem().Type())
+	sliceVal := reflect.MakeSlice(sliceType, 0, 0)
+
+	err := d.findAll(collection, &sliceVal, filter, opts)
+	if err != nil {
+		return fmt.Errorf("error finding objects: %v", err)
 	}
 
-	return errors.New("no object found with filter")
+	if sliceVal.Len() == 0 {
+		return fmt.Errorf("no object found based on filter")
+	}
+
+	return setValue(object, sliceVal.Index(0).Interface())
 }
 
 func (d *DB) FindAll(collection string, slice interface{}, filter *db.Filter, opts *db.Options) error {
@@ -73,6 +87,16 @@ func (d *DB) FindAll(collection string, slice interface{}, filter *db.Filter, op
 		return errors.New("slice arg does not point to a *slice*")
 	}
 
+	err := d.findAll(collection, &sliceVal, filter, opts)
+	if err != nil {
+		return fmt.Errorf("error in finding: %v", err)
+	}
+
+	pointerVal.Elem().Set(sliceVal)
+	return nil
+}
+
+func (d *DB) findAll(collection string, sliceVal *reflect.Value, filter *db.Filter, opts *db.Options) error {
 	if d.collectionMap[collection] == nil {
 		return errors.New("collection does not not exist")
 	}
@@ -85,11 +109,9 @@ func (d *DB) FindAll(collection string, slice interface{}, filter *db.Filter, op
 	for _, data := range *dataSlice {
 		if compareInterfaceToFilter(data, filter) {
 			dataVal := reflect.ValueOf(data)
-			sliceVal = reflect.Append(sliceVal, dataVal)
+			*sliceVal = reflect.Append(*sliceVal, dataVal)
 		}
 	}
-
-	pointerVal.Elem().Set(sliceVal)
 	return nil
 }
 

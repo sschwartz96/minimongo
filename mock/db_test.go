@@ -111,7 +111,6 @@ func TestDB_FindOne(t *testing.T) {
 		collectionMap: map[string]*[]interface{}{
 			"fooCollection":  {testObj{"objName", 123}},
 			"foo2Collection": {testObj{"objName2", 246}},
-			"fooPointerCol":  {&testObj{"objPointer", 246}},
 		},
 	}
 	type args struct {
@@ -172,17 +171,6 @@ func TestDB_FindOne(t *testing.T) {
 		},
 		{
 			name: "FindOne()[4]",
-			args: args{
-				collection: "fooPointerCol",
-				filter:     &db.Filter{"name": "objPointer"},
-				object:     &testObj{},
-				opts:       db.CreateOptions(),
-			},
-			d:       testDB,
-			wantErr: false,
-		},
-		{
-			name: "FindOne()[5]",
 			args: args{
 				collection: "fooPointerCol",
 				filter:     &db.Filter{"name": "canfindthis"},
