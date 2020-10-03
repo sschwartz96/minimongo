@@ -4,6 +4,7 @@ import (
 	"context"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/sschwartz96/minimongo/db"
 )
@@ -11,6 +12,7 @@ import (
 type testObj struct {
 	Name  string
 	Value int
+	Time  time.Time
 }
 
 func TestDB_Open(t *testing.T) {
@@ -108,8 +110,8 @@ func TestDB_FindOne(t *testing.T) {
 	t.Parallel()
 	testDB := &DB{
 		collectionMap: map[string]*[]interface{}{
-			"fooCollection":  {testObj{"objName", 123}},
-			"foo2Collection": {testObj{"objName2", 246}},
+			"fooCollection":  {testObj{"objName", 123, time.Time{}}},
+			"foo2Collection": {testObj{"objName2", 246, time.Time{}}},
 		},
 	}
 	type args struct {
@@ -212,8 +214,8 @@ func TestDB_FindAll(t *testing.T) {
 	t.Parallel()
 	testDB := &DB{
 		collectionMap: map[string]*[]interface{}{
-			"fooCollection":  {testObj{"objName", 123}, testObj{"obj2Name", 456}, testObj{"obj3Name", 456}},
-			"foo2Collection": {testObj{"objName2", 246}},
+			"fooCollection":  {testObj{"objName", 123, time.Time{}}, testObj{"obj2Name", 456, time.Time{}}, testObj{"obj3Name", 456, time.Time{}}},
+			"foo2Collection": {testObj{"objName2", 246, time.Time{}}},
 		},
 	}
 	type args struct {
@@ -316,7 +318,7 @@ func TestDB_FindAll(t *testing.T) {
 				opts:       nil,
 			},
 			wantErr:     false,
-			endingSlice: &[]testObj{{"objName", 123}, {"obj2Name", 456}, {"obj3Name", 456}},
+			endingSlice: &[]testObj{{"objName", 123, time.Time{}}, {"obj2Name", 456, time.Time{}}, {"obj3Name", 456, time.Time{}}},
 		},
 		{
 			name: "FindAll()[6]skip",
@@ -328,7 +330,7 @@ func TestDB_FindAll(t *testing.T) {
 				opts:       db.CreateOptions().SetSkip(1),
 			},
 			wantErr:     false,
-			endingSlice: &[]testObj{{"obj2Name", 456}, {"obj3Name", 456}},
+			endingSlice: &[]testObj{{"obj2Name", 456, time.Time{}}, {"obj3Name", 456, time.Time{}}},
 		},
 		{
 			name: "FindAll()[7]limit",
@@ -340,7 +342,7 @@ func TestDB_FindAll(t *testing.T) {
 				opts:       db.CreateOptions().SetSkip(1).SetLimit(1),
 			},
 			wantErr:     false,
-			endingSlice: &[]testObj{{"obj2Name", 456}},
+			endingSlice: &[]testObj{{"obj2Name", 456, time.Time{}}},
 		},
 	}
 	for _, tt := range tests {
@@ -379,7 +381,7 @@ func TestDB_Update(t *testing.T) {
 			args{
 				collection: "",
 				filter:     &db.Filter{"name": "objName"},
-				object:     testObj{"objNameChange", 321},
+				object:     testObj{"objNameChange", 321, time.Time{}},
 			},
 			true,
 		},
@@ -388,7 +390,7 @@ func TestDB_Update(t *testing.T) {
 			args{
 				collection: "fooCollection",
 				filter:     nil,
-				object:     testObj{"objNameChange", 321},
+				object:     testObj{"objNameChange", 321, time.Time{}},
 			},
 			true,
 		},
@@ -397,7 +399,7 @@ func TestDB_Update(t *testing.T) {
 			args{
 				collection: "fooCollection",
 				filter:     &db.Filter{"name": "objName"},
-				object:     testObj{"objNameChange", 321},
+				object:     testObj{"objNameChange", 321, time.Time{}},
 			},
 			false,
 		},
@@ -406,7 +408,7 @@ func TestDB_Update(t *testing.T) {
 			args{
 				collection: "fooCollection",
 				filter:     &db.Filter{"name": "notfound"},
-				object:     testObj{"objNameChange", 321},
+				object:     testObj{"objNameChange", 321, time.Time{}},
 			},
 			true,
 		},
@@ -456,7 +458,7 @@ func TestDB_Upsert(t *testing.T) {
 			args{
 				collection: "",
 				filter:     &db.Filter{"name": "objName"},
-				object:     testObj{"onlyObj", 111111111},
+				object:     testObj{"onlyObj", 111111111, time.Time{}},
 			},
 			true,
 		},
@@ -465,7 +467,7 @@ func TestDB_Upsert(t *testing.T) {
 			args{
 				collection: "",
 				filter:     &db.Filter{"name": "objName"},
-				object:     testObj{"objNameChange", 321},
+				object:     testObj{"objNameChange", 321, time.Time{}},
 			},
 			true,
 		},
@@ -474,7 +476,7 @@ func TestDB_Upsert(t *testing.T) {
 			args{
 				collection: "fooCollection",
 				filter:     nil,
-				object:     testObj{"objNameChange", 321},
+				object:     testObj{"objNameChange", 321, time.Time{}},
 			},
 			true,
 		},
@@ -483,7 +485,7 @@ func TestDB_Upsert(t *testing.T) {
 			args{
 				collection: "fooCollection",
 				filter:     &db.Filter{"name": "objNameButNotInCollection"},
-				object:     testObj{"objNameChange1", 321},
+				object:     testObj{"objNameChange1", 321, time.Time{}},
 			},
 			false,
 		},
@@ -492,7 +494,7 @@ func TestDB_Upsert(t *testing.T) {
 			args{
 				collection: "fooCollection",
 				filter:     &db.Filter{"name": "objName"},
-				object:     testObj{"objNameChange2", 321},
+				object:     testObj{"objNameChange2", 321, time.Time{}},
 			},
 			false,
 		},
@@ -519,7 +521,8 @@ func TestDB_Delete(t *testing.T) {
 	t.Parallel()
 	testDB := &DB{
 		map[string]*[]interface{}{
-			"fooCollection": {testObj{"obj1", 1}, testObj{"obj2", 2}, testObj{"obj3", 3}, testObj{"obj4", 4}},
+			"fooCollection": {testObj{"obj1", 1, time.Time{}}, testObj{"obj2", 2, time.Time{}},
+				testObj{"obj3", 3, time.Time{}}, testObj{"obj4", 4, time.Time{}}},
 		},
 	}
 	type args struct {
@@ -652,11 +655,20 @@ func Test_Search(t *testing.T) {
 }
 
 func Test_sortSlice(t *testing.T) {
-	testSlice := []testObj{{"test1", 8}, {"2nd_test_obj", 2}, {"z is a cool letter", 32}, {"okay last one", 11}}
+	testSlice := []testObj{{"test1", 8, time.Unix(1000, 0)}, {"2nd_test_obj", 2, time.Unix(3000, 0)},
+		{"z is a cool letter", 32, time.Unix(7000, 0)}, {"okay last one", 11, time.Unix(1500, 0)}}
 	testSliceVal := reflect.ValueOf(testSlice)
 
-	wantOne := []testObj{{"2nd_test_obj", 2}, {"test1", 8}, {"okay last one", 11}, {"z is a cool letter", 32}}
+	wantOne := []testObj{{"2nd_test_obj", 2, time.Unix(3000, 0)}, {"test1", 8, time.Unix(1000, 0)},
+		{"okay last one", 11, time.Unix(1500, 0)}, {"z is a cool letter", 32, time.Unix(7000, 0)}}
 	wantOneVal := reflect.ValueOf(wantOne)
+
+	wantTwo := []testObj{{"2nd_test_obj", 2, time.Unix(3000, 0)}, {"okay last one", 11, time.Unix(1500, 0)},
+		{"test1", 8, time.Unix(1000, 0)}, {"z is a cool letter", 32, time.Unix(7000, 0)}}
+	wantTwoVal := reflect.ValueOf(wantTwo)
+	wantThree := []testObj{{"test1", 8, time.Unix(1000, 0)}, {"okay last one", 11, time.Unix(1500, 0)},
+		{"2nd_test_obj", 2, time.Unix(3000, 0)}, {"z is a cool letter", 32, time.Unix(7000, 0)}}
+	wantThreeVal := reflect.ValueOf(wantThree)
 
 	type args struct {
 		sliceVal *reflect.Value
@@ -671,6 +683,16 @@ func Test_sortSlice(t *testing.T) {
 			name: "test1",
 			args: args{sliceVal: &testSliceVal, sortOpt: db.CreateOptions().SetSort("value", -1).Sort},
 			want: &wantOneVal,
+		},
+		{
+			name: "test2",
+			args: args{sliceVal: &testSliceVal, sortOpt: db.CreateOptions().SetSort("name", -1).Sort},
+			want: &wantTwoVal,
+		},
+		{
+			name: "test3",
+			args: args{sliceVal: &testSliceVal, sortOpt: db.CreateOptions().SetSort("time", -1).Sort},
+			want: &wantThreeVal,
 		},
 	}
 	for _, tt := range tests {

@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"reflect"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/sschwartz96/minimongo/db"
 )
@@ -127,7 +127,9 @@ func (d *DB) findAll(collection string, sliceVal *reflect.Value, filter *db.Filt
 	}
 
 	// sort the data
-	sliceVal = sortSlice(sliceVal, opts.Sort)
+	if opts.Sort != nil {
+		sliceVal = sortSlice(sliceVal, opts.Sort)
+	}
 
 	return nil
 }
@@ -139,13 +141,31 @@ func sortSlice(sliceVal *reflect.Value, sortOpt *db.SortOption) *reflect.Value {
 
 func generateLessFunc(sliceVal *reflect.Value, sortOpt *db.SortOption) func(i, j int) bool {
 	return func(i, j int) bool {
-		log.Println("we can see data:", sliceVal.Index(i).Interface())
 		iVal := sliceVal.Index(i).FieldByNameFunc(matchFieldFunc(sortOpt.Key))
 		jVal := sliceVal.Index(j).FieldByNameFunc(matchFieldFunc(sortOpt.Key))
-		if sortOpt.Value > 0 {
-			return iVal.Int() > jVal.Int()
+
+		switch iVal.Kind() {
+
+		case reflect.Int, reflect.Int64, reflect.Int32:
+			if sortOpt.Value > 0 {
+				return iVal.Int() > jVal.Int()
+			}
+			return iVal.Int() < jVal.Int()
+
+		case reflect.String:
+			if sortOpt.Value > 0 {
+				return iVal.String() > jVal.String()
+			}
+			return iVal.String() < jVal.String()
+
+		case reflect.ValueOf(time.Now()).Kind():
+			if sortOpt.Value > 0 {
+				return iVal.Interface().(time.Time).After(jVal.Interface().(time.Time))
+			}
+			return iVal.Interface().(time.Time).Before(jVal.Interface().(time.Time))
 		}
-		return iVal.Int() < jVal.Int()
+
+		return false
 	}
 }
 
