@@ -19,14 +19,14 @@ type Database interface {
 type Filter map[string]interface{}
 
 type Options struct {
-	limit int64
-	skip  int64
-	sort  *sortOption
+	Limit int64
+	Skip  int64
+	Sort  *SortOption
 }
 
-type sortOption struct {
-	key   string
-	value int // 1 ascending, -1 descending
+type SortOption struct {
+	Key   string
+	Value int // 1 ascending, -1 descending
 }
 
 func CreateOptions() *Options {
@@ -34,12 +34,12 @@ func CreateOptions() *Options {
 }
 
 func (o *Options) SetLimit(v int64) *Options {
-	o.limit = v
+	o.Limit = v
 	return o
 }
 
 func (o *Options) SetSkip(v int64) *Options {
-	o.skip = v
+	o.Skip = v
 	return o
 }
 
@@ -51,6 +51,6 @@ func (o *Options) SetSort(key string, value int) *Options {
 	} else {
 		value = -1
 	}
-	o.sort = &sortOption{key: key, value: value}
+	o.Sort = &SortOption{Key: key, Value: value}
 	return o
 }

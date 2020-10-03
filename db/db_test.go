@@ -31,7 +31,7 @@ func TestOptions_SetLimit(t *testing.T) {
 		args args
 		want *Options
 	}{
-		{"0:nil", CreateOptions(), args{10}, &Options{limit: 10}},
+		{"0:nil", CreateOptions(), args{10}, &Options{Limit: 10}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -52,7 +52,7 @@ func TestOptions_SetSkip(t *testing.T) {
 		args args
 		want *Options
 	}{
-		{"0:nil", CreateOptions(), args{10}, &Options{skip: 10}},
+		{"0:nil", CreateOptions(), args{10}, &Options{Skip: 10}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -74,14 +74,14 @@ func TestOptions_SetSort(t *testing.T) {
 		args args
 		want *Options
 	}{
-		{"0: zero value", CreateOptions(), args{"foo", 0}, &Options{sort: &sortOption{"foo", -1}}},
-		{"1: one value", CreateOptions(), args{"foo", 1}, &Options{sort: &sortOption{"foo", 1}}},
-		{"-1: negative one value", CreateOptions(), args{"foo", -1}, &Options{sort: &sortOption{"foo", -1}}},
+		{"0: zero value", CreateOptions(), args{"foo", 0}, &Options{Sort: &SortOption{"foo", -1}}},
+		{"1: one value", CreateOptions(), args{"foo", 1}, &Options{Sort: &SortOption{"foo", 1}}},
+		{"-1: negative one value", CreateOptions(), args{"foo", -1}, &Options{Sort: &SortOption{"foo", -1}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.o.SetSort(tt.args.key, tt.args.value); !reflect.DeepEqual(*(got.sort), *(tt.want.sort)) {
-				t.Errorf("Options.SetSort() = %v, want %v", *(got.sort), *(tt.want.sort))
+			if got := tt.o.SetSort(tt.args.key, tt.args.value); !reflect.DeepEqual(*(got.Sort), *(tt.want.Sort)) {
+				t.Errorf("Options.SetSort() = %v, want %v", *(got.Sort), *(tt.want.Sort))
 			}
 		})
 	}

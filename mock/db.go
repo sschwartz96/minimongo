@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"reflect"
+	"sort"
 	"strings"
 
 	"github.com/sschwartz96/minimongo/db"
@@ -105,14 +107,52 @@ func (d *DB) findAll(collection string, sliceVal *reflect.Value, filter *db.Filt
 		filter = &db.Filter{}
 	}
 
-	dataSlice := d.collectionMap[collection]
-	for _, data := range *dataSlice {
+	if opts == nil {
+		opts = db.CreateOptions()
+	}
+
+	var limitCounter int64
+	dataSlice := *d.collectionMap[collection]
+
+	for i := opts.Skip; int(i) < len(dataSlice); i++ {
+		data := dataSlice[i]
 		if compareInterfaceToFilter(data, filter) {
 			dataVal := reflect.ValueOf(data)
 			*sliceVal = reflect.Append(*sliceVal, dataVal)
+			limitCounter++
+			if limitCounter == opts.Limit {
+				break
+			}
 		}
 	}
+
+	// sort the data
+	sliceVal = sortSlice(sliceVal, opts.Sort)
+
 	return nil
+}
+
+func sortSlice(sliceVal *reflect.Value, sortOpt *db.SortOption) *reflect.Value {
+	sort.SliceStable(sliceVal.Interface(), generateLessFunc(sliceVal, sortOpt))
+	return sliceVal
+}
+
+func generateLessFunc(sliceVal *reflect.Value, sortOpt *db.SortOption) func(i, j int) bool {
+	return func(i, j int) bool {
+		log.Println("we can see data:", sliceVal.Index(i).Interface())
+		iVal := sliceVal.Index(i).FieldByNameFunc(matchFieldFunc(sortOpt.Key))
+		jVal := sliceVal.Index(j).FieldByNameFunc(matchFieldFunc(sortOpt.Key))
+		if sortOpt.Value > 0 {
+			return iVal.Int() > jVal.Int()
+		}
+		return iVal.Int() < jVal.Int()
+	}
+}
+
+func matchFieldFunc(name string) func(string) bool {
+	return func(to string) bool {
+		return isLowerEqual(removeUnderscore(name), removeUnderscore(to))
+	}
 }
 
 func (d *DB) Update(collection string, object interface{}, filter *db.Filter) error {
@@ -212,18 +252,25 @@ func compareInterfaceToFilter(a interface{}, filter *db.Filter) bool {
 	}
 
 	for filterKey, filterVal := range *filter {
-		for i := 0; i < aVal.NumField(); i++ {
-			fieldVal := aVal.Field(i)
-			fieldName := aVal.Type().Field(i).Name
-			if isLowerEqual(filterKey, fieldName) ||
-				isLowerEqual(removeUnderscore(filterKey), removeUnderscore(fieldName)) {
-				if isEqual(reflect.ValueOf(filterVal), fieldVal) {
-					break
-				} else {
-					return false
-				}
-			}
+		fieldVal := aVal.FieldByNameFunc(matchFieldFunc(filterKey))
+		if fieldVal.IsZero() {
+			continue
 		}
+		if !isEqual(reflect.ValueOf(filterVal), fieldVal) {
+			return false
+		}
+		//	for i := 0; i < aVal.NumField(); i++ {
+		//		fieldVal := aVal.Field(i)
+		//		fieldName := aVal.Type().Field(i).Name
+		//		if isLowerEqual(filterKey, fieldName) ||
+		//			isLowerEqual(removeUnderscore(filterKey), removeUnderscore(fieldName)) {
+		//			if isEqual(reflect.ValueOf(filterVal), fieldVal) {
+		//				break
+		//			} else {
+		//				return false
+		//			}
+		//		}
+		//	}
 	}
 	return true
 }

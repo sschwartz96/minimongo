@@ -19,14 +19,14 @@ func ConvertToFindOptions(opts *Options) *options.FindOptions {
 		return options.Find()
 	}
 	o := options.Find()
-	if opts.limit > 0 {
-		o.SetLimit(opts.limit)
+	if opts.Limit > 0 {
+		o.SetLimit(opts.Limit)
 	}
-	if opts.skip > 0 {
-		o.SetSkip(opts.skip)
+	if opts.Skip > 0 {
+		o.SetSkip(opts.Skip)
 	}
-	if opts.sort != nil {
-		o.SetSort(bson.M{opts.sort.key: opts.sort.value})
+	if opts.Sort != nil {
+		o.SetSort(bson.M{opts.Sort.Key: opts.Sort.Value})
 	}
 	return o
 }
@@ -37,11 +37,11 @@ func ConvertToFindOneOptions(opts *Options) *options.FindOneOptions {
 		return options.FindOne()
 	}
 	o := options.FindOne()
-	if opts.skip > 0 {
-		o.SetSkip(opts.skip)
+	if opts.Skip > 0 {
+		o.SetSkip(opts.Skip)
 	}
-	if opts.sort != nil {
-		o.SetSort(bson.M{opts.sort.key: opts.sort.value})
+	if opts.Sort != nil {
+		o.SetSort(bson.M{opts.Sort.Key: opts.Sort.Value})
 	}
 	return o
 }

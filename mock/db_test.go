@@ -2,7 +2,6 @@ package mock
 
 import (
 	"context"
-	"log"
 	"reflect"
 	"testing"
 
@@ -237,7 +236,7 @@ func TestDB_FindAll(t *testing.T) {
 				collection: "fooCollection",
 				slice:      &[]testObj{},
 				filter:     &db.Filter{"name": "objName"},
-				opts:       nil,
+				opts:       db.CreateOptions(),
 			},
 			wantErr: false,
 			endingSlice: &[]testObj{
@@ -251,7 +250,7 @@ func TestDB_FindAll(t *testing.T) {
 				collection: "fooCollection",
 				slice:      &[]testObj{},
 				filter:     &db.Filter{"value": 456},
-				opts:       nil,
+				opts:       db.CreateOptions(),
 			},
 			wantErr: false,
 			endingSlice: &[]testObj{
@@ -266,7 +265,7 @@ func TestDB_FindAll(t *testing.T) {
 				collection: "fooCollection",
 				slice:      []testObj{},
 				filter:     &db.Filter{"value": 456},
-				opts:       nil,
+				opts:       db.CreateOptions(),
 			},
 			wantErr:     true,
 			endingSlice: &[]testObj{},
@@ -278,7 +277,7 @@ func TestDB_FindAll(t *testing.T) {
 				collection: "fooCollection",
 				slice:      &testObj{},
 				filter:     &db.Filter{"value": 456},
-				opts:       nil,
+				opts:       db.CreateOptions(),
 			},
 			wantErr:     true,
 			endingSlice: &[]testObj{},
@@ -318,6 +317,30 @@ func TestDB_FindAll(t *testing.T) {
 			},
 			wantErr:     false,
 			endingSlice: &[]testObj{{"objName", 123}, {"obj2Name", 456}, {"obj3Name", 456}},
+		},
+		{
+			name: "FindAll()[6]skip",
+			d:    testDB,
+			args: args{
+				collection: "fooCollection",
+				slice:      &[]testObj{},
+				filter:     nil,
+				opts:       db.CreateOptions().SetSkip(1),
+			},
+			wantErr:     false,
+			endingSlice: &[]testObj{{"obj2Name", 456}, {"obj3Name", 456}},
+		},
+		{
+			name: "FindAll()[7]limit",
+			d:    testDB,
+			args: args{
+				collection: "fooCollection",
+				slice:      &[]testObj{},
+				filter:     nil,
+				opts:       db.CreateOptions().SetSkip(1).SetLimit(1),
+			},
+			wantErr:     false,
+			endingSlice: &[]testObj{{"obj2Name", 456}},
 		},
 	}
 	for _, tt := range tests {
@@ -524,7 +547,6 @@ func TestDB_Delete(t *testing.T) {
 				for _, filterVal := range *tt.args.filter {
 					for _, data := range *tt.d.collectionMap[tt.args.collection] {
 						dataVal := reflect.ValueOf(data)
-						log.Println("db:", *tt.d.collectionMap[tt.args.collection])
 						for i := 0; i < dataVal.NumField(); i++ {
 							if reflect.DeepEqual(dataVal.Field(i).Interface(),
 								reflect.ValueOf(filterVal).Interface()) {
@@ -624,6 +646,37 @@ func Test_Search(t *testing.T) {
 
 			if !reflect.DeepEqual(tt.args.slice, tt.endingSlice) {
 				t.Errorf("DB.Search() error = wrong slice, got: %v, wanted: %v", tt.args.slice, tt.endingSlice)
+			}
+		})
+	}
+}
+
+func Test_sortSlice(t *testing.T) {
+	testSlice := []testObj{{"test1", 8}, {"2nd_test_obj", 2}, {"z is a cool letter", 32}, {"okay last one", 11}}
+	testSliceVal := reflect.ValueOf(testSlice)
+
+	wantOne := []testObj{{"2nd_test_obj", 2}, {"test1", 8}, {"okay last one", 11}, {"z is a cool letter", 32}}
+	wantOneVal := reflect.ValueOf(wantOne)
+
+	type args struct {
+		sliceVal *reflect.Value
+		sortOpt  *db.SortOption
+	}
+	tests := []struct {
+		name string
+		args args
+		want *reflect.Value
+	}{
+		{
+			name: "test1",
+			args: args{sliceVal: &testSliceVal, sortOpt: db.CreateOptions().SetSort("value", -1).Sort},
+			want: &wantOneVal,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := sortSlice(tt.args.sliceVal, tt.args.sortOpt); !reflect.DeepEqual(got.Interface(), tt.want.Interface()) {
+				t.Errorf("sortSlice() =\ngot: %v\nwant: %v\n", got.Interface(), tt.want.Interface())
 			}
 		})
 	}
