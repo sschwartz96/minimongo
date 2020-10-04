@@ -39,7 +39,11 @@ func (d *DB) Insert(collection string, object interface{}) error {
 	}
 
 	// this allows pointers to be derefenced
-	toInsert := reflect.ValueOf(object).Interface()
+	objVal := reflect.ValueOf(object)
+	toInsert := objVal.Interface()
+	if objVal.Kind() == reflect.Ptr {
+		toInsert = objVal.Elem().Interface()
+	}
 
 	if d.collectionMap[collection] == nil {
 		col := make([]interface{}, 1)

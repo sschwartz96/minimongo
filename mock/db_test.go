@@ -82,12 +82,22 @@ func TestDB_Insert(t *testing.T) {
 		name    string
 		d       *DB
 		args    args
+		want    interface{}
 		wantErr bool
 	}{
-		{"0:empty collection", testDB, args{"", nil}, true},
-		{"1:nil", testDB, args{"test", nil}, true},
-		{"2:single object", testDB, args{"test", testObj{Name: "testObj1", Value: 123}}, false},
-		{"2:single ptr object", testDB, args{"test", &testObj{Name: "testObj1", Value: 123}}, false},
+		{"0:empty collection", testDB, args{"", nil}, nil, true},
+		{"1:nil", testDB, args{"test", nil}, nil, true},
+		{"2:single object", testDB,
+			args{"test", testObj{Name: "testObj1", Value: 123}},
+			testObj{Name: "testObj1", Value: 123}, false,
+		},
+		{
+			"2:single ptr object",
+			testDB,
+			args{"test", &testObj{Name: "testObj1", Value: 123}},
+			testObj{Name: "testObj1", Value: 123},
+			false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -96,7 +106,7 @@ func TestDB_Insert(t *testing.T) {
 			}
 			if tt.args.object != nil {
 				for _, o := range *tt.d.collectionMap[tt.args.collection] {
-					if reflect.DeepEqual(tt.args.object, o) {
+					if reflect.DeepEqual(tt.want, o) {
 						return
 					}
 				}
