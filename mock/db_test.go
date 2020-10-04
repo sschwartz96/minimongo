@@ -239,7 +239,7 @@ func TestDB_FindAll(t *testing.T) {
 		d           *DB
 		args        args
 		wantErr     bool
-		endingSlice *[]testObj
+		endingSlice interface{}
 	}{
 		{
 			name: "FindAll()[0]single",
@@ -353,6 +353,18 @@ func TestDB_FindAll(t *testing.T) {
 			},
 			wantErr:     false,
 			endingSlice: &[]testObj{{"obj2Name", 456, time.Time{}}},
+		},
+		{
+			name: "FindAll()[8]slice contains pointers",
+			d:    testDB,
+			args: args{
+				collection: "fooCollection",
+				slice:      &[]*testObj{},
+				filter:     nil,
+				opts:       db.CreateOptions().SetSkip(1).SetLimit(1),
+			},
+			wantErr:     false,
+			endingSlice: &[]*testObj{&testObj{"obj2Name", 456, time.Time{}}},
 		},
 	}
 	for _, tt := range tests {

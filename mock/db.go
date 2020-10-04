@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"reflect"
 	"sort"
 	"strings"
@@ -98,6 +99,8 @@ func (d *DB) FindAll(collection string, slice interface{}, filter *db.Filter, op
 		return fmt.Errorf("error in finding: %v", err)
 	}
 
+	sliceType := sliceVal.Type()
+	log.Println("sliceKind: ", sliceType)
 	pointerVal.Elem().Set(sliceVal)
 	return nil
 }
