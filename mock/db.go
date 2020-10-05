@@ -94,13 +94,16 @@ func (d *DB) FindAll(collection string, slice interface{}, filter *db.Filter, op
 		return errors.New("slice arg does not point to a *slice*")
 	}
 
+	sliceType := sliceVal.Type()
+	if strings.Contains(sliceType.String(), "*") {
+		log.Println("sliceKind: ", sliceType)
+	}
+
 	err := d.findAll(collection, &sliceVal, filter, opts)
 	if err != nil {
 		return fmt.Errorf("error in finding: %v", err)
 	}
 
-	sliceType := sliceVal.Type()
-	log.Println("sliceKind: ", sliceType)
 	pointerVal.Elem().Set(sliceVal)
 	return nil
 }
@@ -125,6 +128,14 @@ func (d *DB) findAll(collection string, sliceVal *reflect.Value, filter *db.Filt
 		data := dataSlice[i]
 		if compareInterfaceToFilter(data, filter) {
 			dataVal := reflect.ValueOf(data)
+			// if the slice contains pointers to object
+			if reflect.TypeOf(sliceVal.Interface()).Elem().Kind() == reflect.Ptr {
+				p := reflect.New(reflect.TypeOf(data))
+				p.Elem().Set(reflect.ValueOf(data))
+
+				dataVal = p
+			}
+
 			*sliceVal = reflect.Append(*sliceVal, dataVal)
 			limitCounter++
 			if limitCounter == opts.Limit {
@@ -148,9 +159,14 @@ func sortSlice(sliceVal *reflect.Value, sortOpt *db.SortOption) *reflect.Value {
 
 func generateLessFunc(sliceVal *reflect.Value, sortOpt *db.SortOption) func(i, j int) bool {
 	return func(i, j int) bool {
-		iVal := sliceVal.Index(i).FieldByNameFunc(matchFieldFunc(sortOpt.Key))
-		jVal := sliceVal.Index(j).FieldByNameFunc(matchFieldFunc(sortOpt.Key))
-
+		var iVal, jVal reflect.Value
+		if sliceVal.Index(i).Kind() == reflect.Ptr {
+			iVal = sliceVal.Index(i).Elem().FieldByNameFunc(matchFieldFunc(sortOpt.Key))
+			jVal = sliceVal.Index(j).Elem().FieldByNameFunc(matchFieldFunc(sortOpt.Key))
+		} else {
+			iVal = sliceVal.Index(i).FieldByNameFunc(matchFieldFunc(sortOpt.Key))
+			jVal = sliceVal.Index(j).FieldByNameFunc(matchFieldFunc(sortOpt.Key))
+		}
 		switch iVal.Kind() {
 
 		case reflect.Int, reflect.Int64, reflect.Int32:
