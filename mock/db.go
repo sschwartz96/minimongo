@@ -248,9 +248,8 @@ func (d *DB) Search(collection string, search string, fields []string, slice int
 	for _, data := range *dataSlice {
 		dataVal := reflect.ValueOf(data)
 		for _, field := range fields {
-			fieldValue := dataVal.FieldByName(field)
-			if strings.Contains(fieldValue.String(), search) {
-				//sliceVal = reflect.Append(sliceVal, dataVal)
+			fieldValue := dataVal.FieldByNameFunc(matchFieldFunc(field))
+			if containsLower(fieldValue.String(), search) {
 				appendSliceVal(&sliceVal, data)
 			}
 		}
@@ -302,18 +301,6 @@ func compareInterfaceToFilter(a interface{}, filter *db.Filter) bool {
 		if !isEqual(reflect.ValueOf(filterVal), fieldVal) {
 			return false
 		}
-		//	for i := 0; i < aVal.NumField(); i++ {
-		//		fieldVal := aVal.Field(i)
-		//		fieldName := aVal.Type().Field(i).Name
-		//		if isLowerEqual(filterKey, fieldName) ||
-		//			isLowerEqual(removeUnderscore(filterKey), removeUnderscore(fieldName)) {
-		//			if isEqual(reflect.ValueOf(filterVal), fieldVal) {
-		//				break
-		//			} else {
-		//				return false
-		//			}
-		//		}
-		//	}
 	}
 	return true
 }
@@ -323,6 +310,10 @@ func isEqual(a, b reflect.Value) bool {
 		return a.Interface() == b.Interface()
 	}
 	return false
+}
+
+func containsLower(s, sub string) bool {
+	return strings.Contains(strings.ToLower(s), strings.ToLower(sub))
 }
 
 func isLowerEqual(a, b string) bool {

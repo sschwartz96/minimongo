@@ -364,7 +364,7 @@ func TestDB_FindAll(t *testing.T) {
 				opts:       db.CreateOptions().SetSkip(1).SetLimit(1),
 			},
 			wantErr:     false,
-			endingSlice: &[]*testObj{&testObj{"obj2Name", 456, time.Time{}}},
+			endingSlice: &[]*testObj{{"obj2Name", 456, time.Time{}}},
 		},
 	}
 	for _, tt := range tests {
@@ -608,7 +608,7 @@ func Test_Search(t *testing.T) {
 			name: "Search()_0",
 			args: args{
 				collection: "testCol",
-				fields:     []string{"Name"},
+				fields:     []string{"Name", "Value"},
 				slice:      &[]testObj{},
 				search:     "object",
 			},
@@ -622,7 +622,7 @@ func Test_Search(t *testing.T) {
 			name: "Search()_1",
 			args: args{
 				collection: "testCol",
-				fields:     []string{"Name"},
+				fields:     []string{"Name", "Value"},
 				slice:      &[]testObj{},
 				search:     "test",
 			},
@@ -636,7 +636,21 @@ func Test_Search(t *testing.T) {
 			name: "Search()_2_slice_of_ptrs",
 			args: args{
 				collection: "testCol",
-				fields:     []string{"Name"},
+				fields:     []string{"Name", "Value"},
+				slice:      &[]*testObj{},
+				search:     "test",
+			},
+			d:       testDB,
+			wantErr: false,
+			endingSlice: &[]testObj{
+				obj1, obj3,
+			},
+		},
+		{
+			name: "Search()_3_lowercase_names",
+			args: args{
+				collection: "testCol",
+				fields:     []string{"name", "value"},
 				slice:      &[]*testObj{},
 				search:     "test",
 			},
