@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"reflect"
 	"sort"
 	"strings"
@@ -94,11 +93,6 @@ func (d *DB) FindAll(collection string, slice interface{}, filter *db.Filter, op
 		return errors.New("slice arg does not point to a *slice*")
 	}
 
-	sliceType := sliceVal.Type()
-	if strings.Contains(sliceType.String(), "*") {
-		log.Println("sliceKind: ", sliceType)
-	}
-
 	err := d.findAll(collection, &sliceVal, filter, opts)
 	if err != nil {
 		return fmt.Errorf("error in finding: %v", err)
@@ -127,16 +121,8 @@ func (d *DB) findAll(collection string, sliceVal *reflect.Value, filter *db.Filt
 	for i := opts.Skip; int(i) < len(dataSlice); i++ {
 		data := dataSlice[i]
 		if compareInterfaceToFilter(data, filter) {
-			dataVal := reflect.ValueOf(data)
-			// if the slice contains pointers to object
-			if reflect.TypeOf(sliceVal.Interface()).Elem().Kind() == reflect.Ptr {
-				p := reflect.New(reflect.TypeOf(data))
-				p.Elem().Set(reflect.ValueOf(data))
+			appendSliceVal(sliceVal, data)
 
-				dataVal = p
-			}
-
-			*sliceVal = reflect.Append(*sliceVal, dataVal)
 			limitCounter++
 			if limitCounter == opts.Limit {
 				break
@@ -146,7 +132,7 @@ func (d *DB) findAll(collection string, sliceVal *reflect.Value, filter *db.Filt
 
 	// sort the data
 	if opts.Sort != nil {
-		sliceVal = sortSlice(sliceVal, opts.Sort)
+		sortSlice(sliceVal, opts.Sort)
 	}
 
 	return nil
@@ -264,13 +250,27 @@ func (d *DB) Search(collection string, search string, fields []string, slice int
 		for _, field := range fields {
 			fieldValue := dataVal.FieldByName(field)
 			if strings.Contains(fieldValue.String(), search) {
-				sliceVal = reflect.Append(sliceVal, dataVal)
+				//sliceVal = reflect.Append(sliceVal, dataVal)
+				appendSliceVal(&sliceVal, data)
 			}
 		}
 	}
 
 	pointerVal.Elem().Set(sliceVal)
 	return nil
+}
+
+func appendSliceVal(sliceVal *reflect.Value, data interface{}) {
+	dataVal := reflect.ValueOf(data)
+	// if the slice contains pointers to object
+	if reflect.TypeOf(sliceVal.Interface()).Elem().Kind() == reflect.Ptr {
+		p := reflect.New(reflect.TypeOf(data))
+		p.Elem().Set(reflect.ValueOf(data))
+
+		dataVal = p
+	}
+
+	*sliceVal = reflect.Append(*sliceVal, dataVal)
 }
 
 func checkParams(collection string, filter *db.Filter) error {

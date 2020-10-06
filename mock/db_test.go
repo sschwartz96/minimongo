@@ -587,22 +587,10 @@ func TestDB_Delete(t *testing.T) {
 
 func Test_Search(t *testing.T) {
 	t.Parallel()
-	testDB := &DB{collectionMap: map[string]*[]interface{}{
-		"testCol": {
-			testObj{
-				Name:  "test object 1",
-				Value: 123,
-			},
-			testObj{
-				Name:  "this is object 2",
-				Value: 123,
-			},
-			testObj{
-				Name:  "test object 3",
-				Value: 123,
-			},
-		},
-	}}
+	obj1 := testObj{Name: "test object 1", Value: 123}
+	obj2 := testObj{Name: "this is object 2", Value: 123}
+	obj3 := testObj{Name: "test object 3", Value: 123}
+	testDB := &DB{collectionMap: map[string]*[]interface{}{"testCol": {obj1, obj2, obj3}}}
 	type args struct {
 		collection string
 		search     string
@@ -627,22 +615,11 @@ func Test_Search(t *testing.T) {
 			d:       testDB,
 			wantErr: false,
 			endingSlice: &[]testObj{
-				{
-					Name:  "test object 1",
-					Value: 123,
-				},
-				{
-					Name:  "this is object 2",
-					Value: 123,
-				},
-				{
-					Name:  "test object 3",
-					Value: 123,
-				},
+				obj1, obj2, obj3,
 			},
 		},
 		{
-			name: "Search()_0",
+			name: "Search()_1",
 			args: args{
 				collection: "testCol",
 				fields:     []string{"Name"},
@@ -652,14 +629,21 @@ func Test_Search(t *testing.T) {
 			d:       testDB,
 			wantErr: false,
 			endingSlice: &[]testObj{
-				{
-					Name:  "test object 1",
-					Value: 123,
-				},
-				{
-					Name:  "test object 3",
-					Value: 123,
-				},
+				obj1, obj3,
+			},
+		},
+		{
+			name: "Search()_2_slice_of_ptrs",
+			args: args{
+				collection: "testCol",
+				fields:     []string{"Name"},
+				slice:      &[]*testObj{},
+				search:     "test",
+			},
+			d:       testDB,
+			wantErr: false,
+			endingSlice: &[]testObj{
+				obj1, obj3,
 			},
 		},
 	}
@@ -669,7 +653,17 @@ func Test_Search(t *testing.T) {
 				t.Errorf("DB.Search() error = %v, wantErr %v", err, tt.wantErr)
 			}
 
-			if !reflect.DeepEqual(tt.args.slice, tt.endingSlice) {
+			gotSliceVal := reflect.ValueOf(tt.args.slice).Elem()
+			if reflect.TypeOf(gotSliceVal.Interface()).Elem().Kind() == reflect.Ptr {
+				slice, ok := tt.args.slice.(*[]*testObj)
+				if ok {
+					for i := range *slice {
+						if !reflect.DeepEqual(*(*slice)[i], (*tt.endingSlice)[i]) {
+							t.Errorf("DB.Search() error = wrong slice, got: %v, wanted: %v", tt.args.slice, tt.endingSlice)
+						}
+					}
+				}
+			} else if !reflect.DeepEqual(tt.args.slice, tt.endingSlice) {
 				t.Errorf("DB.Search() error = wrong slice, got: %v, wanted: %v", tt.args.slice, tt.endingSlice)
 			}
 		})
