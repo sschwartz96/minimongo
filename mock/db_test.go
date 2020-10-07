@@ -2,6 +2,7 @@ package mock
 
 import (
 	"context"
+	"log"
 	"reflect"
 	"testing"
 	"time"
@@ -13,6 +14,33 @@ type testObj struct {
 	Name  string
 	Value int
 	Time  time.Time
+}
+
+func sliceDeepEqual(sliceI, sliceJ interface{}) bool {
+	valI := derefencedValue(reflect.ValueOf(sliceI))
+	valJ := derefencedValue(reflect.ValueOf(sliceJ))
+	if valI.Kind() != reflect.Slice || valJ.Kind() != reflect.Slice {
+		return false
+	}
+	if valI.Len() != valJ.Len() {
+		return false
+	}
+	for i := 0; i < valI.Len(); i++ {
+		vI := derefencedValue(valI.Index(i))
+		vJ := derefencedValue(valJ.Index(i))
+		if !reflect.DeepEqual(vI.Interface(), vJ.Interface()) {
+			log.Printf("not equal: \n\t%v\n\t%v\n", vI.Interface(), vJ.Interface())
+			return false
+		}
+	}
+	return true
+}
+
+func derefencedValue(v reflect.Value) reflect.Value {
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+	return v
 }
 
 func TestDB_Open(t *testing.T) {
@@ -184,12 +212,23 @@ func TestDB_FindOne(t *testing.T) {
 			name: "FindOne()[4]",
 			args: args{
 				collection: "fooPointerCol",
-				filter:     &db.Filter{"name": "canfindthis"},
+				filter:     &db.Filter{"name": "cantfindthis"},
 				object:     &testObj{},
 				opts:       db.CreateOptions(),
 			},
 			d:       testDB,
 			wantErr: true,
+		},
+		{
+			name: "FindOne()[5]mutiple_filter",
+			args: args{
+				collection: "foo2Collection",
+				filter:     &db.Filter{"name": "objName2", "value": 246},
+				object:     &testObj{},
+				opts:       db.CreateOptions(),
+			},
+			d:       testDB,
+			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
@@ -222,9 +261,13 @@ func TestDB_FindOne(t *testing.T) {
 
 func TestDB_FindAll(t *testing.T) {
 	t.Parallel()
+	obj1 := testObj{"objName", 123, time.Now().Add(time.Minute * -1)}
+	obj2 := testObj{"obj2Name", 456, time.Now()}
+	obj3 := testObj{"obj3Name", 456, time.Now().Add(time.Minute * -2)}
+
 	testDB := &DB{
 		collectionMap: map[string]*[]interface{}{
-			"fooCollection":  {testObj{"objName", 123, time.Time{}}, testObj{"obj2Name", 456, time.Time{}}, testObj{"obj3Name", 456, time.Time{}}},
+			"fooCollection":  {obj1, obj2, obj3},
 			"foo2Collection": {testObj{"objName2", 246, time.Time{}}},
 		},
 	}
@@ -250,10 +293,8 @@ func TestDB_FindAll(t *testing.T) {
 				filter:     &db.Filter{"name": "objName"},
 				opts:       db.CreateOptions(),
 			},
-			wantErr: false,
-			endingSlice: &[]testObj{
-				{Name: "objName", Value: 123},
-			},
+			wantErr:     false,
+			endingSlice: &[]testObj{obj1},
 		},
 		{
 			name: "FindAll()[1]two values",
@@ -264,11 +305,8 @@ func TestDB_FindAll(t *testing.T) {
 				filter:     &db.Filter{"value": 456},
 				opts:       db.CreateOptions(),
 			},
-			wantErr: false,
-			endingSlice: &[]testObj{
-				{Name: "obj2Name", Value: 456},
-				{Name: "obj3Name", Value: 456},
-			},
+			wantErr:     false,
+			endingSlice: &[]testObj{obj2, obj3},
 		},
 		{
 			name: "FindAll()[2]not pointer to slice",
@@ -328,7 +366,7 @@ func TestDB_FindAll(t *testing.T) {
 				opts:       nil,
 			},
 			wantErr:     false,
-			endingSlice: &[]testObj{{"objName", 123, time.Time{}}, {"obj2Name", 456, time.Time{}}, {"obj3Name", 456, time.Time{}}},
+			endingSlice: &[]testObj{obj1, obj2, obj3},
 		},
 		{
 			name: "FindAll()[6]skip",
@@ -340,7 +378,7 @@ func TestDB_FindAll(t *testing.T) {
 				opts:       db.CreateOptions().SetSkip(1),
 			},
 			wantErr:     false,
-			endingSlice: &[]testObj{{"obj2Name", 456, time.Time{}}, {"obj3Name", 456, time.Time{}}},
+			endingSlice: &[]testObj{obj2, obj3},
 		},
 		{
 			name: "FindAll()[7]limit",
@@ -352,7 +390,7 @@ func TestDB_FindAll(t *testing.T) {
 				opts:       db.CreateOptions().SetSkip(1).SetLimit(1),
 			},
 			wantErr:     false,
-			endingSlice: &[]testObj{{"obj2Name", 456, time.Time{}}},
+			endingSlice: &[]testObj{obj2},
 		},
 		{
 			name: "FindAll()[8]slice contains pointers",
@@ -364,7 +402,19 @@ func TestDB_FindAll(t *testing.T) {
 				opts:       db.CreateOptions().SetSkip(1).SetLimit(1),
 			},
 			wantErr:     false,
-			endingSlice: &[]*testObj{{"obj2Name", 456, time.Time{}}},
+			endingSlice: &[]*testObj{&obj2},
+		},
+		{
+			name: "FindAll()[9]sort_by_time",
+			d:    testDB,
+			args: args{
+				collection: "fooCollection",
+				slice:      &[]*testObj{},
+				filter:     nil,
+				opts:       db.CreateOptions().SetSort("time", -1),
+			},
+			wantErr:     false,
+			endingSlice: &[]*testObj{&obj2, &obj1, &obj3},
 		},
 	}
 	for _, tt := range tests {
@@ -372,7 +422,7 @@ func TestDB_FindAll(t *testing.T) {
 			if err := tt.d.FindAll(tt.args.collection, tt.args.slice, tt.args.filter, tt.args.opts); (err != nil) != tt.wantErr {
 				t.Errorf("DB.FindAll() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			if !tt.wantErr && !reflect.DeepEqual(tt.args.slice, tt.endingSlice) {
+			if !tt.wantErr && !sliceDeepEqual(tt.args.slice, tt.endingSlice) {
 				t.Errorf("DB.FindAll() error = wrong slice, got: %v, wanted: %v", tt.args.slice, tt.endingSlice)
 			}
 		})
@@ -398,7 +448,7 @@ func TestDB_Update(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{"update0",
+		{"update0_invalid_collection",
 			testDB,
 			args{
 				collection: "",
@@ -407,7 +457,7 @@ func TestDB_Update(t *testing.T) {
 			},
 			true,
 		},
-		{"update1",
+		{"update1_invalid_filter_name",
 			testDB,
 			args{
 				collection: "fooCollection",
@@ -685,19 +735,18 @@ func Test_Search(t *testing.T) {
 }
 
 func Test_sortSlice(t *testing.T) {
-	testSlice := []testObj{{"test1", 8, time.Unix(1000, 0)}, {"2nd_test_obj", 2, time.Unix(3000, 0)},
-		{"z is a cool letter", 32, time.Unix(7000, 0)}, {"okay last one", 11, time.Unix(1500, 0)}}
+	obj1 := testObj{"test1", 8, time.Unix(1000, 0)}
+	obj2 := testObj{"2nd_test_obj", 2, time.Unix(3000, 0)}
+	obj3 := testObj{"z is a cool letter", 32, time.Unix(7000, 0)}
+	obj4 := testObj{"okay last one", 11, time.Unix(1500, 0)}
+	testSlice := []testObj{obj1, obj2, obj3, obj4}
 	testSliceVal := reflect.ValueOf(testSlice)
 
-	wantOne := []testObj{{"2nd_test_obj", 2, time.Unix(3000, 0)}, {"test1", 8, time.Unix(1000, 0)},
-		{"okay last one", 11, time.Unix(1500, 0)}, {"z is a cool letter", 32, time.Unix(7000, 0)}}
+	wantOne := []testObj{obj3, obj4, obj1, obj2}
 	wantOneVal := reflect.ValueOf(wantOne)
-
-	wantTwo := []testObj{{"2nd_test_obj", 2, time.Unix(3000, 0)}, {"okay last one", 11, time.Unix(1500, 0)},
-		{"test1", 8, time.Unix(1000, 0)}, {"z is a cool letter", 32, time.Unix(7000, 0)}}
+	wantTwo := []testObj{obj2, obj4, obj1, obj3}
 	wantTwoVal := reflect.ValueOf(wantTwo)
-	wantThree := []testObj{{"test1", 8, time.Unix(1000, 0)}, {"okay last one", 11, time.Unix(1500, 0)},
-		{"2nd_test_obj", 2, time.Unix(3000, 0)}, {"z is a cool letter", 32, time.Unix(7000, 0)}}
+	wantThree := []testObj{obj3, obj2, obj4, obj1}
 	wantThreeVal := reflect.ValueOf(wantThree)
 
 	type args struct {
@@ -716,7 +765,7 @@ func Test_sortSlice(t *testing.T) {
 		},
 		{
 			name: "test2",
-			args: args{sliceVal: &testSliceVal, sortOpt: db.CreateOptions().SetSort("name", -1).Sort},
+			args: args{sliceVal: &testSliceVal, sortOpt: db.CreateOptions().SetSort("name", 1).Sort},
 			want: &wantTwoVal,
 		},
 		{

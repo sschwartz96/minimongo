@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/sschwartz96/minimongo/db"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type DB struct {
@@ -131,7 +132,7 @@ func (d *DB) findAll(collection string, sliceVal *reflect.Value, filter *db.Filt
 	}
 
 	// sort the data
-	if opts.Sort != nil {
+	if opts.Sort != nil && opts.Sort.Value != 0 {
 		sortSlice(sliceVal, opts.Sort)
 	}
 
@@ -157,23 +158,40 @@ func generateLessFunc(sliceVal *reflect.Value, sortOpt *db.SortOption) func(i, j
 
 		case reflect.Int, reflect.Int64, reflect.Int32:
 			if sortOpt.Value > 0 {
-				return iVal.Int() > jVal.Int()
+				return iVal.Int() < jVal.Int()
 			}
-			return iVal.Int() < jVal.Int()
+			return iVal.Int() > jVal.Int()
 
 		case reflect.String:
 			if sortOpt.Value > 0 {
-				return iVal.String() > jVal.String()
+				return iVal.String() < jVal.String()
 			}
-			return iVal.String() < jVal.String()
+			return iVal.String() > jVal.String()
 
-		case reflect.ValueOf(time.Now()).Kind():
-			if sortOpt.Value > 0 {
-				return iVal.Interface().(time.Time).After(jVal.Interface().(time.Time))
+		default:
+			if iVal.IsZero() {
+				return false
 			}
-			return iVal.Interface().(time.Time).Before(jVal.Interface().(time.Time))
+			switch iVal.Type() {
+
+			case reflect.ValueOf(time.Now()).Type():
+				if sortOpt.Value > 0 {
+					return iVal.Interface().(time.Time).Before(jVal.Interface().(time.Time))
+				}
+				return iVal.Interface().(time.Time).After(jVal.Interface().(time.Time))
+
+			case reflect.ValueOf(timestamppb.Now()).Type():
+				iStamp := iVal.Interface().(*timestamppb.Timestamp).AsTime()
+				jStamp := jVal.Interface().(*timestamppb.Timestamp).AsTime()
+				if sortOpt.Value > 0 {
+					return iStamp.Before(jStamp)
+				}
+				return iStamp.After(jStamp)
+			}
 		}
 
+		//log.Println("generateLessFunc() didn't match any cases")
+		//log.Println(iVal)
 		return false
 	}
 }
@@ -299,6 +317,7 @@ func compareInterfaceToFilter(a interface{}, filter *db.Filter) bool {
 			continue
 		}
 		if !isEqual(reflect.ValueOf(filterVal), fieldVal) {
+			//log.Printf("compareInterfaceToFilter() not equal: \n\t%v\n\t%v\n", filterVal, fieldVal.Interface())
 			return false
 		}
 	}
@@ -306,10 +325,21 @@ func compareInterfaceToFilter(a interface{}, filter *db.Filter) bool {
 }
 
 func isEqual(a, b reflect.Value) bool {
-	if reflect.TypeOf(a) == reflect.TypeOf(b) {
-		return a.Interface() == b.Interface()
+	if a.Type() == b.Type() {
+		return reflect.DeepEqual(a.Interface(), b.Interface())
 	}
-	return false
+	if isIntKind(a) && isIntKind(b) {
+		return a.Int() == b.Int()
+	}
+
+	//log.Printf("isEqual():incorrect types: %v ?= %v\n", a.Type(), b.Type())
+	return a.Interface() == b.Interface()
+}
+
+func isIntKind(v reflect.Value) bool {
+	return v.Kind() == reflect.Int || v.Kind() == reflect.Int8 ||
+		v.Kind() == reflect.Int16 || v.Kind() == reflect.Int32 ||
+		v.Kind() == reflect.Int64
 }
 
 func containsLower(s, sub string) bool {
