@@ -1,8 +1,8 @@
-# minimongo
+# stockpile
 
 ** Current state: ALPHA **
 
-In-memory mongo-go-driver implementation
+Interface to different databases, meant to allow easy mocking through the stockpile/mock package.
 
 Useful in two ways:
 1. Setup a persistance layer between data and database using the database interface
