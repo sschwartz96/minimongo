@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sschwartz96/minimongo/db"
+	"github.com/sschwartz96/stockpile/db"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
