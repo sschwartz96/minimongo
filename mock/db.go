@@ -313,9 +313,9 @@ func compareInterfaceToFilter(a interface{}, filter *db.Filter) bool {
 
 	for filterKey, filterVal := range *filter {
 		fieldVal := aVal.FieldByNameFunc(matchFieldFunc(filterKey))
-		if fieldVal.IsZero() {
-			continue
-		}
+		//if fieldVal.IsZero() {
+		//	continue
+		//}
 		if !isEqual(reflect.ValueOf(filterVal), fieldVal) {
 			//log.Printf("compareInterfaceToFilter() not equal: \n\t%v\n\t%v\n", filterVal, fieldVal.Interface())
 			return false
