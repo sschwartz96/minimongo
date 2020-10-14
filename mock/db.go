@@ -313,6 +313,9 @@ func compareInterfaceToFilter(a interface{}, filter *db.Filter) bool {
 
 	for filterKey, filterVal := range *filter {
 		fieldVal := aVal.FieldByNameFunc(matchFieldFunc(filterKey))
+		if !fieldVal.IsValid() {
+			continue
+		}
 		if fieldVal.IsZero() {
 			continue
 		}
