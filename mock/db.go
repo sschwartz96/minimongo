@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"reflect"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/sschwartz96/stockpile/db"
@@ -14,6 +16,7 @@ import (
 )
 
 type DB struct {
+	sync.RWMutex
 	collectionMap map[string](*[]interface{})
 }
 
@@ -32,6 +35,9 @@ func (d *DB) Close(ctx context.Context) error {
 }
 
 func (d *DB) Insert(collection string, object interface{}) error {
+	d.Lock()
+	defer d.Unlock()
+
 	if collection == "" {
 		return errors.New("collection is empty")
 	}
@@ -59,6 +65,8 @@ func (d *DB) Insert(collection string, object interface{}) error {
 }
 
 func (d *DB) FindOne(collection string, object interface{}, filter *db.Filter, opts *db.Options) error {
+	d.RLock()
+	defer d.RUnlock()
 	if d.collectionMap[collection] == nil {
 		return errors.New("collection doesn not exist")
 	}
@@ -85,6 +93,12 @@ func (d *DB) FindOne(collection string, object interface{}, filter *db.Filter, o
 }
 
 func (d *DB) FindAll(collection string, slice interface{}, filter *db.Filter, opts *db.Options) error {
+	log.Println("locking mutex")
+	d.RLock()
+	defer func() {
+		log.Println("unlocking mutex")
+		d.RUnlock()
+	}()
 	pointerVal := reflect.ValueOf(slice)
 	if pointerVal.Kind() != reflect.Ptr {
 		return errors.New("slice arg must be a *pointer* (to slice)")
@@ -203,6 +217,8 @@ func matchFieldFunc(name string) func(string) bool {
 }
 
 func (d *DB) Update(collection string, object interface{}, filter *db.Filter) error {
+	d.Lock()
+	defer d.Unlock()
 	if err := checkParams(collection, filter); err != nil {
 		return fmt.Errorf("mock.DB.Update() error: %v", err)
 	}
@@ -218,23 +234,31 @@ func (d *DB) Update(collection string, object interface{}, filter *db.Filter) er
 }
 
 func (d *DB) Upsert(collection string, object interface{}, filter *db.Filter) error {
+	d.Lock()
 	if err := checkParams(collection, filter); err != nil {
+		d.Unlock()
 		return fmt.Errorf("mock.DB.Update() error: %v", err)
 	}
 	dataSlice := d.collectionMap[collection]
 	// if collection is empty just insert
 	if dataSlice == nil {
+		d.Unlock()
 		return d.Insert(collection, object)
 	}
 	for i, data := range *dataSlice {
 		if compareInterfaceToFilter(data, filter) {
-			return setValue(&(*dataSlice)[i], object)
+			err := setValue(&(*dataSlice)[i], object)
+			d.Unlock()
+			return err
 		}
 	}
+	d.Unlock()
 	return d.Insert(collection, object)
 }
 
 func (d *DB) Delete(collection string, filter *db.Filter) error {
+	d.Lock()
+	defer d.Unlock()
 	if err := checkParams(collection, filter); err != nil {
 		return fmt.Errorf("mock.DB.Update() error: %v", err)
 	}
@@ -260,6 +284,8 @@ func (d *DB) Delete(collection string, filter *db.Filter) error {
 }
 
 func (d *DB) Search(collection string, search string, fields []string, slice interface{}) error {
+	d.RLock()
+	defer d.RUnlock()
 	dataSlice := d.collectionMap[collection]
 	pointerVal := reflect.ValueOf(slice)
 	sliceVal := pointerVal.Elem()

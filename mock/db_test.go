@@ -534,7 +534,7 @@ func TestDB_Upsert(t *testing.T) {
 			},
 			true,
 		},
-		{"upsert0",
+		{"upsert0.5",
 			testDB,
 			args{
 				collection: "",
@@ -592,7 +592,7 @@ func TestDB_Upsert(t *testing.T) {
 func TestDB_Delete(t *testing.T) {
 	t.Parallel()
 	testDB := &DB{
-		map[string]*[]interface{}{
+		collectionMap: map[string]*[]interface{}{
 			"fooCollection": {testObj{"obj1", 1, time.Time{}}, testObj{"obj2", 2, time.Time{}},
 				testObj{"obj3", 3, time.Time{}}, testObj{"obj4", 4, time.Time{}}},
 		},
