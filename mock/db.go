@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"reflect"
 	"sort"
 	"strings"
@@ -93,12 +92,8 @@ func (d *DB) FindOne(collection string, object interface{}, filter *db.Filter, o
 }
 
 func (d *DB) FindAll(collection string, slice interface{}, filter *db.Filter, opts *db.Options) error {
-	log.Println("locking mutex")
 	d.RLock()
-	defer func() {
-		log.Println("unlocking mutex")
-		d.RUnlock()
-	}()
+	defer d.RUnlock()
 	pointerVal := reflect.ValueOf(slice)
 	if pointerVal.Kind() != reflect.Ptr {
 		return errors.New("slice arg must be a *pointer* (to slice)")
