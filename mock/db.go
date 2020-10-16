@@ -4,12 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"reflect"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/sschwartz96/stockpile/db"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -332,32 +335,58 @@ func compareInterfaceToFilter(a interface{}, filter *db.Filter) bool {
 		aVal = aVal.Elem()
 	}
 
-	for filterKey, filterVal := range *filter {
-		fieldVal := aVal.FieldByNameFunc(matchFieldFunc(filterKey))
-		if !fieldVal.IsValid() {
-			continue
-		}
-		if fieldVal.IsZero() {
-			continue
-		}
-		if !isEqual(reflect.ValueOf(filterVal), fieldVal) {
-			//log.Printf("compareInterfaceToFilter() not equal: \n\t%v\n\t%v\n", filterVal, fieldVal.Interface())
+	for filterKey, filterV := range *filter {
+		filterVal, ok := deferencedValueOf(filterV)
+		if !ok {
+			log.Println("not okay filterVal")
 			return false
 		}
+		fieldVal, ok := deferencedValueOf(aVal.FieldByNameFunc(matchFieldFunc(filterKey)).Interface())
+		if !ok {
+			log.Println("not okay fieldVal")
+			return false
+		}
+		if !isEqual(filterVal, fieldVal) {
+			//log.Printf("compareInterfaceToFilter() not equal: \n\t%v\n\t%v\n", filterVal.Interface(), fieldVal.Interface())
+			return false
+		}
+		//log.Printf("compareInterfaceToFilter() EQUAL: \n\t%v\n\t%v\n", filterVal.Interface(), fieldVal.Interface())
 	}
 	return true
 }
 
-func isEqual(a, b reflect.Value) bool {
-	if a.Type() == b.Type() {
-		return reflect.DeepEqual(a.Interface(), b.Interface())
+func deferencedValueOf(i interface{}) (reflect.Value, bool) {
+	iVal := reflect.ValueOf(i)
+	if !iVal.IsValid() || !iVal.CanInterface() {
+		return iVal, false
 	}
-	if isIntKind(a) && isIntKind(b) {
-		return a.Int() == b.Int()
+	if iVal.Kind() == reflect.Ptr {
+		iVal = iVal.Elem()
+		if !iVal.IsValid() || !iVal.CanInterface() {
+			return iVal, false
+		}
 	}
+	return iVal, true
+}
 
-	//log.Printf("isEqual():incorrect types: %v ?= %v\n", a.Type(), b.Type())
-	return a.Interface() == b.Interface()
+func isEqual(a, b reflect.Value) bool {
+	//if (a.Kind() == b.Kind() && a.Type() == b.Type()) || (isIntKind(a) && isIntKind(b)) {
+	switch a.Kind() {
+	case reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Int:
+		log.Println("comparing int:")
+		return a.Int() == b.Int()
+	case reflect.String, reflect.Bool:
+		log.Println("comparing string, bool:")
+		return a.Interface() == b.Interface()
+	default:
+		log.Println("comparing type:", a.Type())
+		return cmp.Equal(a.Interface(), b.Interface(), cmpopts.IgnoreUnexported(a.Interface()))
+	}
+	//}
+	//log.Println("kind or type not match")
+	//log.Printf("a.Type() = %v, b.Type() = %v", a.Type(), b.Type())
+	//log.Printf("a.Kind() = %v, b.Kind() = %v", a.Kind(), b.Kind())
+	//return false
 }
 
 func isIntKind(v reflect.Value) bool {
